@@ -1,0 +1,634 @@
+{
+  "common": {
+    "admin": "Admin",
+    "account": "account",
+    "email": "Email",
+    "password": "Password",
+    "emptyDash": "-",
+    "previousPage": "Previous",
+    "nextPage": "Next",
+    "plan": {
+      "enterprise": "Enterprise",
+      "startup": "Startup",
+      "free": "Free"
+    },
+    "status": {
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    }
+  },
+  "homePage": {
+    "searchKeyWords": "Search"
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "search": "Search",
+    "reset": "Reset",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "invite": "Invite",
+    "saveChanges": "Save changes",
+    "action": "Action",
+    "openMenu": "Open menu"
+  },
+  "validation": {
+    "required": "Required",
+    "minLength": "At least {min} characters"
+  },
+  "language": {
+    "change": "Change language",
+    "option": {
+      "en": "English",
+      "zh": "Chinese"
+    },
+    "current": {
+      "en": "English",
+      "zh": "中文"
+    }
+  },
+  "menu": {
+    "main": "Main Menu",
+    "other": "Other",
+    "dashboard": "Dashboard",
+    "teams": "Teams",
+    "addTeam": "Add Team",
+    "logout": "Log out",
+    "system": {
+      "title": "System Management",
+      "users": "Users",
+      "dicts": "Dictionaries",
+      "agreements": "Agreements"
+    },
+    "settings": {
+      "title": "System Settings",
+      "profile": "Profile",
+      "account": "Account",
+      "appearance": "Appearance",
+      "notifications": "Notifications",
+      "notificationAnnouncements": "Notification Announcements",
+      "notificationTemplates": "Message Templates",
+      "auditLogs": "Audit Logs"
+    }
+  },
+  "errors": {
+    "actions": {
+      "goBack": "Go Back",
+      "backHome": "Back to Home",
+      "goUserLogin": "Go to User Login"
+    },
+    "unauthorized": {
+      "subtitle": "Unauthorized",
+      "description": "Your login status is invalid or expired. Please sign in before continuing."
+    },
+    "forbidden": {
+      "subtitle": "Forbidden",
+      "description": "You are not authorized to access this page."
+    },
+    "notFound": {
+      "subtitle": "Page Not Found",
+      "description": "The page you are looking for might have been removed, renamed, or is temporarily unavailable."
+    },
+    "serverError": {
+      "subtitle": "Internal Server Error",
+      "description": "The server encountered an unexpected condition which prevented it from fulfilling the request."
+    },
+    "serviceUnavailable": {
+      "subtitle": "Service Unavailable",
+      "description": "The server is currently unable to handle the request because of temporary overload or maintenance."
+    }
+  },
+  "pages": {
+    "signUp": {
+      "title": "Sign Up",
+      "description": "Enter your account and password to create an account.",
+      "hasAccount": "Already have an account?",
+      "toLogin": "Sign In",
+      "accountPlaceholder": "Enter account (min 4)",
+      "passwordPlaceholder": "Enter password (min 8)",
+      "confirmPassword": "Confirm Password",
+      "submit": "Create Account",
+      "success": "Account created. Please sign in.",
+      "failedTitle": "Sign up failed",
+      "failedRetry": "Sign up failed. Please try again later.",
+      "fillRequired": "Please complete required fields before submitting.",
+      "passwordNotMatch": "Passwords do not match",
+      "agreePrefix": "By creating an account, you agree to our",
+      "agreeAnd": "and"
+    },
+    "billing": {
+      "title": "Plans & Billing",
+      "upgrade": "Upgrade to Pro"
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Manage admin preferences, theme, and notification options.",
+      "profile": {
+        "title": "Profile",
+        "description": "Maintain the current admin account avatar and nickname.",
+        "basicTitle": "Basic Profile",
+        "basicDescription": "Changes are synchronized to the current session and sidebar user info immediately.",
+        "avatar": "Avatar",
+        "avatarTips": "Supports jpeg, jpg, svg, png, webp. Max 1MB per image.",
+        "userName": "Nickname",
+        "userNamePlaceholder": "Enter nickname",
+        "account": "Login Account",
+        "role": "Role",
+        "save": "Save Profile",
+        "saveSuccess": "Profile updated successfully",
+        "saveFailed": "Failed to update profile"
+      },
+      "account": {
+        "title": "Account Settings",
+        "description": "Manage the default language and sign-in password for the admin account.",
+        "languageTitle": "Default Language",
+        "languageDescription": "The language preference is stored in this browser and reused the next time you sign in.",
+        "languageLabel": "Interface Language",
+        "languagePlaceholder": "Select a default language",
+        "saveLanguage": "Save Language",
+        "languageSaved": "Default language saved",
+        "passwordTitle": "Change Password",
+        "passwordDescription": "Enter the current password and set a new sign-in password.",
+        "oldPassword": "Current Password",
+        "oldPasswordPlaceholder": "Enter current password",
+        "newPassword": "New Password",
+        "newPasswordPlaceholder": "Enter new password",
+        "checkPassword": "Confirm New Password",
+        "checkPasswordPlaceholder": "Re-enter new password",
+        "savePassword": "Save Password",
+        "passwordSaved": "Password updated successfully",
+        "passwordSaveFailed": "Failed to update password"
+      },
+      "appearancePreferences": {
+        "title": "Appearance preferences",
+        "description": "Configure admin appearance preferences for this browser. Changes are saved automatically.",
+        "resetDefaults": "Reset defaults",
+        "shortcut": "Admin appearance preferences",
+        "shortcutTitle": "Appearance preferences",
+        "shortcutDescription": "Quickly adjust admin theme, layout, and menu style.",
+        "openFullSettings": "Open full settings",
+        "savedHint": "Preferences save automatically in this browser.",
+        "themeSection": "Theme",
+        "themeDescription": "Choose the color mode, shadcn palette, radius, and admin font.",
+        "colorMode": "Color mode",
+        "font": "Font",
+        "fontPlaceholder": "Select font",
+        "palette": "Palette",
+        "radius": "Radius",
+        "componentStyle": "Component style",
+        "componentStyleHint": "This is a runtime appearance preset. It does not rewrite components.json or generated component source.",
+        "layoutSection": "Layout and navigation",
+        "layoutDescription": "Tune the admin workspace width, menu behavior, and sidebar startup state.",
+        "contentLayout": "Content layout",
+        "menuStyle": "Menu style",
+        "sidebarStartup": "Sidebar startup",
+        "sidebarStartupPlaceholder": "Select startup state",
+        "displaySection": "Display effects",
+        "displayDescription": "Adjust motion and optional chrome for dense admin work.",
+        "density": "Density",
+        "densityPlaceholder": "Select density",
+        "reduceMotion": "Reduce motion",
+        "reduceMotionDescription": "Disable non-essential transitions.",
+        "stripedTables": "Striped tables",
+        "stripedTablesDescription": "Show alternating row backgrounds where supported.",
+        "showBreadcrumbs": "Show breadcrumbs",
+        "showBreadcrumbsDescription": "Keep page path context visible.",
+        "showPageTitles": "Show page titles",
+        "showPageTitlesDescription": "Keep page heading regions visible.",
+        "colorModes": {
+          "light": "Light",
+          "dark": "Dark",
+          "system": "System"
+        },
+        "fonts": {
+          "system": "System",
+          "inter": "Inter",
+          "manrope": "Manrope",
+          "geist": "Geist",
+          "mono": "Mono",
+          "serif": "Serif"
+        },
+        "componentStyles": {
+          "reka-vega": "Reka Vega",
+          "reka-nova": "Reka Nova",
+          "reka-maia": "Reka Maia",
+          "reka-lyra": "Reka Lyra",
+          "reka-mira": "Reka Mira",
+          "reka-luma": "Reka Luma"
+        },
+        "componentStyleDescriptions": {
+          "reka-vega": "Balanced default surfaces and control hierarchy.",
+          "reka-nova": "Brighter lifted cards and crisp controls.",
+          "reka-maia": "Tighter borders for dense admin pages.",
+          "reka-lyra": "Softer panels with lighter shadows.",
+          "reka-mira": "Translucent layers and more pronounced focus states.",
+          "reka-luma": "High-contrast direct surfaces with minimal depth."
+        },
+        "themes": {
+          "slate": "Slate",
+          "gray": "Gray",
+          "zinc": "Zinc",
+          "neutral": "Neutral",
+          "stone": "Stone",
+          "red": "Red",
+          "rose": "Rose",
+          "pink": "Pink",
+          "fuchsia": "Fuchsia",
+          "purple": "Purple",
+          "violet": "Violet",
+          "indigo": "Indigo",
+          "blue": "Blue",
+          "sky": "Sky",
+          "cyan": "Cyan",
+          "teal": "Teal",
+          "emerald": "Emerald",
+          "green": "Green",
+          "lime": "Lime",
+          "yellow": "Yellow",
+          "amber": "Amber",
+          "orange": "Orange"
+        },
+        "contentLayouts": {
+          "full": "Full",
+          "centered": "Centered"
+        },
+        "navigationModes": {
+          "collapsible": "Collapsible",
+          "vercel": "Vercel"
+        },
+        "navigationDescriptions": {
+          "collapsible": "Use the classic collapsible sidebar.",
+          "vercel": "Use progressive drill-down navigation."
+        },
+        "sidebarStates": {
+          "remember": "Remember last state",
+          "expanded": "Expanded by default",
+          "collapsed": "Collapsed by default"
+        },
+        "densities": {
+          "comfortable": "Comfortable",
+          "standard": "Standard",
+          "compact": "Compact"
+        }
+      }
+    },
+    "users": {
+      "title": "User Management",
+      "description": "Manage admin accounts, roles, statuses, and password resets.",
+      "createUser": "Create User",
+      "createTitle": "Create User",
+      "editTitle": "Edit User",
+      "formDescription": "Maintain the account, profile, role, status, and avatar fields.",
+      "loadingDetail": "Loading user details...",
+      "filterTitle": "Filters",
+      "filterDescription": "Filter admin users by nickname, role, and status.",
+      "listTitle": "User List",
+      "total": "Total {total} users.",
+      "loading": "Loading users...",
+      "empty": "No user data",
+      "page": "Page {page} / {totalPages}",
+      "allRoles": "All Roles",
+      "allStatus": "All Statuses",
+      "deleteTitle": "Confirm user deletion",
+      "deleteDescription": "The user record cannot be restored after deletion. Please confirm whether to continue.",
+      "confirmDelete": "Confirm Delete",
+      "deleteSuccess": "User deleted successfully",
+      "deleteFailed": "Failed to delete user",
+      "protectedAdminCannotDelete": "The built-in super administrator sakura cannot be deleted",
+      "protectedAdminCannotDisable": "The built-in super administrator sakura cannot be disabled",
+      "createSuccess": "User created successfully. Default password: 12345678",
+      "updateSuccess": "User updated successfully",
+      "saveFailed": "Failed to save user",
+      "resetPassword": "Reset Password",
+      "resetPasswordTitle": "Confirm password reset",
+      "resetPasswordDescription": "The user's password will be reset to the default password 12345678. Continue?",
+      "confirmResetPassword": "Confirm Reset",
+      "resetPasswordSuccess": "Password reset to default password 12345678",
+      "resetPasswordFailed": "Failed to reset password",
+      "enableUser": "Enable",
+      "disableUser": "Disable",
+      "toggleStatusTitle": "Confirm status change",
+      "enableDescription": "The user will be able to log in again after being enabled.",
+      "disableDescription": "The user will no longer be able to log in after being disabled.",
+      "confirmEnable": "Confirm Enable",
+      "confirmDisable": "Confirm Disable",
+      "toggleStatusSuccess": "User status updated successfully",
+      "toggleStatusFailed": "Failed to update user status",
+      "columns": {
+        "userAccount": "Account",
+        "userName": "Nickname",
+        "userAvatar": "Avatar",
+        "userProfile": "Profile",
+        "status": "Status",
+        "userRole": "Role",
+        "updateTime": "Updated At",
+        "remark": "Remark"
+      },
+      "roles": {
+        "admin": "Admin",
+        "user": "User"
+      },
+      "form": {
+        "accountPlaceholder": "Enter login account",
+        "namePlaceholder": "Enter nickname",
+        "avatarPlaceholder": "Supports jpeg, jpg, svg, png, and webp. Max 1MB per image.",
+        "profilePlaceholder": "Enter user profile",
+        "rolePlaceholder": "Select a user role",
+        "statusPlaceholder": "Select a user status",
+        "searchNamePlaceholder": "Search by nickname",
+        "accountRequired": "Please enter a user account",
+        "roleRequired": "Please select a user role"
+      }
+    },
+    "home": {
+      "badge": "AI Image-Text Creation Platform",
+      "title": "Sakura Passage AI turns agent collaboration into image-text creation.",
+      "description": "A tutorial-grade platform centered on AI agent collaboration and multimodal content generation, built with Spring Boot 3, Spring AI Alibaba, and Vue3.",
+      "startCreation": "Enter Studio",
+      "enterAdmin": "Go to Admin",
+      "guideTitle": "Platform Guide",
+      "guideDesc": "The user portal focuses on AI creation entry points, while the admin console maintains users, system configuration, and future creation resources.",
+      "userLoginPath": "User login entry: `/auth/sign-in`",
+      "adminLoginPath": "Unified login entry: `/auth/sign-in`",
+      "accessNote": "After unified authentication, role permissions determine whether admin access is allowed.",
+      "recentTitle": "Capability Preview",
+      "metrics": {
+        "workflow": "Agent Workflow",
+        "workflowHint": "Supports multi-step orchestration",
+        "imageModes": "Image Modes",
+        "imageModesHint": "Includes Nano Banana Pro",
+        "content": "Multimodal Creation",
+        "contentHint": "Generate articles, prompts, and images together"
+      },
+      "features": {
+        "agentTitle": "AI Agent Collaboration",
+        "agentDesc": "Build an orchestrated creation flow from topic planning to writing, polishing, and image generation.",
+        "imageTitle": "7 Image Generation Modes",
+        "imageDesc": "Cover text-to-image, image-to-image, multi-model image generation, and Nano Banana Pro.",
+        "adminTitle": "Admin Collaboration",
+        "adminDesc": "Users with admin roles can jump into the console to maintain platform configuration and creation resources."
+      },
+      "highlights": {
+        "workflowTitle": "Agent Workflow Tutorial",
+        "workflowContent": "Demonstrates the full chain from topic planning and article generation to automatic illustrations.",
+        "workflowTime": "10 minutes ago",
+        "imageTitle": "Multimodal Generation",
+        "imageContent": "Gradually integrates 7 image generation modes for comparing generation strategies.",
+        "imageTime": "Today 09:20",
+        "configTitle": "Admin Configuration Entry",
+        "configContent": "Administrators can maintain system configuration, users, and future creation resources.",
+        "configTime": "Today 08:00"
+      }
+    },
+    "login": {
+      "title": "User Login",
+      "description": "A unified login entry for quickly building full-stack Web applications with role-based redirects.",
+      "failedTitle": "Login Failed",
+      "failedRetry": "Login failed, please try again later.",
+      "emailPlaceholder": "Enter your login account",
+      "passwordPlaceholder": "12345678",
+      "enterUser": "Enter User Portal",
+      "demoTip": "The sample password must satisfy the backend minimum length of 8. Demo accounts are shown in the login form.",
+      "noAccount": "No account yet?",
+      "toSignUp": "Sign up",
+      "agreePrefix": "By signing in, you agree to our",
+      "agreeAnd": "and",
+      "fillRequired": "Please complete required fields before signing in."
+    },
+    "authPortal": {
+      "user": {
+        "badge": "SAKURA PASSAGE AI",
+        "title": "Sign in to the Creation Platform",
+        "description": "Enter your account and password to access the AI image-text creation platform. The platform routes each user by account role.",
+        "submit": "Enter Platform",
+        "heroTitle": "An AI image-text creation platform centered on agent collaboration.",
+        "heroDescription": "Unified login, role routing, and baseline admin capabilities are already built in. Article generation, workflow orchestration, and multimodal illustration can be added on top.",
+        "features": {
+          "creation": "The user portal focuses on creation entry points for future article generation and illustration workflows.",
+          "resources": "Built-in admin modules cover common capabilities such as users, dictionaries, and agreements.",
+          "switchAdmin": "Unified authentication and role routing are wired in, so creation features can extend their own permission rules."
+        }
+      },
+      "admin": {
+        "badge": "ADMIN CONSOLE",
+        "title": "Sign in to the Platform",
+        "description": "Enter your account and password to continue. The platform routes each user by account role.",
+        "submit": "Enter Admin Console",
+        "heroTitle": "Start with unified authentication and build full-stack Web apps faster.",
+        "heroDescription": "The platform provides login, permission-based routing, admin layout, and baseline business modules to reduce repeated setup work.",
+        "features": {
+          "dashboard": "Admin users land on the backend dashboard for baseline management and business configuration.",
+          "permission": "Backend access is still controlled by user roles, so unifying the page does not weaken permission boundaries.",
+          "switchUser": "The admin header keeps a frontend shortcut for quick switching between the console and app frontend."
+        }
+      }
+    },
+    "dicts": {
+      "title": "Dictionary Management",
+      "description": "Maintain core information for dictionary types and dictionary items.",
+      "typeTitle": "Dictionary Types",
+      "itemTitle": "Dictionary Items",
+      "typeTotal": "Total {total} dictionary types.",
+      "itemTotal": "Total {total} items under \"{name}\".",
+      "selectTypeFirst": "Select a dictionary type before managing its items.",
+      "allStatus": "All Statuses",
+      "loadingTypes": "Loading dictionary types...",
+      "loadingItems": "Loading dictionary items...",
+      "loadingTypeDetail": "Loading dictionary type details...",
+      "loadingItemDetail": "Loading dictionary item details...",
+      "emptyTypes": "No dictionary types",
+      "emptyItems": "No dictionary items under the selected type",
+      "page": "Page {page} / {totalPages}",
+      "createType": "Create Type",
+      "createItem": "Create Item",
+      "createTypeTitle": "Create Dictionary Type",
+      "editTypeTitle": "Edit Dictionary Type",
+      "createItemTitle": "Create Dictionary Item",
+      "editItemTitle": "Edit Dictionary Item",
+      "typeCreateSuccess": "Dictionary type created successfully",
+      "typeUpdateSuccess": "Dictionary type updated successfully",
+      "typeSaveFailed": "Failed to save dictionary type",
+      "typeDeleteSuccess": "Dictionary type deleted successfully",
+      "typeDeleteFailed": "Failed to delete dictionary type",
+      "itemCreateSuccess": "Dictionary item created successfully",
+      "itemUpdateSuccess": "Dictionary item updated successfully",
+      "itemSaveFailed": "Failed to save dictionary item",
+      "itemDeleteSuccess": "Dictionary item deleted successfully",
+      "itemDeleteFailed": "Failed to delete dictionary item",
+      "deleteTypeTitle": "Confirm dictionary type deletion",
+      "deleteTypeDescription": "The backend will block deletion when items still exist under this type.",
+      "confirmDeleteType": "Confirm Delete",
+      "deleteItemTitle": "Confirm dictionary item deletion",
+      "deleteItemDescription": "The dictionary item cannot be restored after deletion. Please confirm whether to continue.",
+      "confirmDeleteItem": "Confirm Delete",
+      "columns": {
+        "dictCode": "Dictionary Code",
+        "dictName": "Dictionary Name",
+        "dictLabel": "Label",
+        "dictValue": "Value",
+        "sortOrder": "Sort Order",
+        "status": "Status",
+        "tagType": "Tag Type",
+        "remark": "Remark",
+        "extJson": "Extended JSON",
+        "updateTime": "Updated At"
+      },
+      "typeForm": {
+        "description": "Maintain the dictionary code, name, status, and remark.",
+        "codePlaceholder": "Enter dictionary code",
+        "namePlaceholder": "Enter dictionary name",
+        "statusPlaceholder": "Select a status",
+        "remarkPlaceholder": "Enter a remark",
+        "codeRequired": "Please enter a dictionary code",
+        "nameRequired": "Please enter a dictionary name"
+      },
+      "itemForm": {
+        "description": "The item will always be bound to the currently selected dictionary type.",
+        "labelPlaceholder": "Enter dictionary label",
+        "valuePlaceholder": "Enter dictionary value",
+        "statusPlaceholder": "Select a status",
+        "tagTypePlaceholder": "Select a tag variant",
+        "tagTypeNone": "Use default style",
+        "tagPreview": "Badge Preview",
+        "tagPreviewText": "Preview",
+        "remarkPlaceholder": "Enter a remark",
+        "extJsonPlaceholder": "Enter extended JSON text",
+        "typeRequired": "Please select a dictionary type first",
+        "labelRequired": "Please enter a dictionary label",
+        "valueRequired": "Please enter a dictionary value"
+      }
+    },
+    "agreements": {
+      "title": "Agreement Management",
+      "description": "Maintain rich-text content such as user agreements and privacy policies.",
+      "filterTitle": "Filters",
+      "type": "Agreement Type",
+      "allTypes": "All Types",
+      "titleLabel": "Agreement Title",
+      "titlePlaceholder": "Enter agreement title",
+      "status": "Status",
+      "allStatus": "All Statuses",
+      "listTitle": "Agreement List",
+      "total": "Total {total} agreement records.",
+      "loading": "Loading agreements...",
+      "sortOrder": "Sort Order",
+      "updatedAt": "Updated At",
+      "empty": "No agreement data",
+      "page": "Page {page} / {totalPages}",
+      "deleteTitle": "Confirm agreement deletion",
+      "deleteDesc": "The agreement content cannot be restored after deletion. Please confirm whether to continue.",
+      "confirmDelete": "Confirm Delete",
+      "deleteSuccess": "Agreement deleted successfully",
+      "deleteFailed": "Delete failed"
+    },
+    "help": {
+      "title": "Help Center",
+      "description": "Find help resources and community channels.",
+      "alertTitle": "Heads up!",
+      "alertDesc": "You can find answers to common questions in our help center.",
+      "accounts": {
+        "github": "Project source code or tutorial materials can be linked to the configured GitHub repository.",
+        "discord": "Join our Discord server to ask questions, share projects, and get involved in the community.",
+        "bilibili": "Find us on Bilibili."
+      }
+    }
+  },
+  "premium": {
+    "premium": "premium",
+    "UpgradeNow": "Upgrade Now"
+  },
+  "marketing": {
+    "hero": {
+      "learnPeople": "More than 1K+ people joined",
+      "getMore": "Get more",
+      "title": "Do you dare to use 365 days to witness a complete transformation?",
+      "subtitle": "The hourglass of time is bursting with thunder. When the quantitative change breaks through the critical point, every morning and evening you work hard will turn into a sea of stars!"
+    },
+    "features": {
+      "title": "Features",
+      "feature1": {
+        "title": "Use modern technology",
+        "description": "More modern component library, free to customize each component"
+      },
+      "feature2": {
+        "title": "Easy to deploy",
+        "description": "One-click deployment to your server, no complicated configuration required"
+      },
+      "feature3": {
+        "title": "Open source code",
+        "description": "Every line of code is open source, you can modify and extend it freely"
+      },
+      "feature4": {
+        "title": "Community support",
+        "description": "You can find help in the community and share your experience"
+      }
+    },
+    "evaluation": {
+      "title": "Evaluation",
+      "subtitle": "These evaluations are simulated data, not actual data"
+    },
+    "pricingPlans": {
+      "title": "Pricing Plans",
+      "subtitle": "Choose the plan that suits you",
+      "buy": "Get it now",
+      "hobby": {
+        "title": "Hobby",
+        "description": "Suitable for beginners",
+        "price": "399",
+        "discount": "599",
+        "unit": "$",
+        "billing": {
+          "cycle": "",
+          "period": ""
+        },
+        "features": {
+          "feature1": "Use part of the website code",
+          "feature2": "Get the latest technology updates",
+          "feature3": "More than 100 components",
+          "feature4": "More than 100 pages"
+        }
+      },
+      "starter": {
+        "title": "Starter",
+        "description": "Suitable for beginners",
+        "price": "599",
+        "discount": "899",
+        "unit": "$",
+        "billing": {
+          "cycle": "",
+          "period": ""
+        },
+        "features": {
+          "feature1": "Use the entire site's code",
+          "feature2": "Read the excellent online documentation",
+          "feature3": "Get the latest technical updates",
+          "feature4": "Over 200 components",
+          "feature5": "Over 200 pages"
+        }
+      },
+      "business": {
+        "title": "Business",
+        "description": "Suitable for beginners",
+        "price": "199",
+        "discount": "399",
+        "unit": "$",
+        "billing": {
+          "cycle": "",
+          "period": ""
+        },
+        "features": {
+          "feature1": "Use the entire site's code",
+          "feature2": "Read the excellent online documentation",
+          "feature3": "Get the latest technical updates",
+          "feature4": "Over 200 components",
+          "feature5": "Over 200 pages",
+          "feature6": "Private assistant support"
+        }
+      }
+    },
+    "setup": {
+      "title": "Setup",
+      "subtitle": "Just 3 minutes to start using"
+    }
+  }
+}

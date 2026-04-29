@@ -1,0 +1,634 @@
+{
+  "common": {
+    "admin": "管理端",
+    "account": "账户",
+    "email": "邮箱",
+    "password": "密码",
+    "emptyDash": "-",
+    "previousPage": "上一页",
+    "nextPage": "下一页",
+    "plan": {
+      "enterprise": "企业版",
+      "startup": "创业版",
+      "free": "免费版"
+    },
+    "status": {
+      "enabled": "启用",
+      "disabled": "禁用"
+    }
+  },
+  "homePage": {
+    "searchKeyWords": "搜索"
+  },
+  "actions": {
+    "refresh": "刷新",
+    "search": "查询",
+    "reset": "重置",
+    "cancel": "取消",
+    "delete": "删除",
+    "edit": "编辑",
+    "invite": "邀请",
+    "saveChanges": "保存修改",
+    "action": "操作",
+    "openMenu": "打开菜单"
+  },
+  "validation": {
+    "required": "必填项",
+    "minLength": "至少 {min} 个字符"
+  },
+  "language": {
+    "change": "切换语言",
+    "option": {
+      "en": "English",
+      "zh": "中文"
+    },
+    "current": {
+      "en": "English",
+      "zh": "中文"
+    }
+  },
+  "menu": {
+    "main": "主菜单",
+    "other": "其他",
+    "dashboard": "仪表盘",
+    "teams": "团队",
+    "addTeam": "新增团队",
+    "logout": "退出登录",
+    "system": {
+      "title": "系统管理",
+      "users": "用户管理",
+      "dicts": "字典管理",
+      "agreements": "协议管理"
+    },
+    "settings": {
+      "title": "系统设置",
+      "profile": "个人资料",
+      "account": "账户设置",
+      "appearance": "外观设置",
+      "notifications": "通知设置",
+      "notificationAnnouncements": "通知公告",
+      "notificationTemplates": "消息模板",
+      "auditLogs": "审计日志"
+    }
+  },
+  "errors": {
+    "actions": {
+      "goBack": "返回上一页",
+      "backHome": "返回首页",
+      "goUserLogin": "去用户端登录"
+    },
+    "unauthorized": {
+      "subtitle": "未授权",
+      "description": "当前登录状态无效或已失效，请先登录后再继续访问。"
+    },
+    "forbidden": {
+      "subtitle": "禁止访问",
+      "description": "你没有访问当前页面的权限。"
+    },
+    "notFound": {
+      "subtitle": "页面未找到",
+      "description": "你访问的页面可能已被删除、改名，或者暂时不可用。"
+    },
+    "serverError": {
+      "subtitle": "服务器内部错误",
+      "description": "服务器处理请求时发生了未预期的错误。"
+    },
+    "serviceUnavailable": {
+      "subtitle": "服务不可用",
+      "description": "服务器当前因维护或过载暂时无法处理请求。"
+    }
+  },
+  "pages": {
+    "signUp": {
+      "title": "注册",
+      "description": "请输入账号和密码创建新账户。",
+      "hasAccount": "已有账号？",
+      "toLogin": "去登录",
+      "accountPlaceholder": "请输入账号（至少 4 位）",
+      "passwordPlaceholder": "请输入密码（至少 8 位）",
+      "confirmPassword": "确认密码",
+      "submit": "创建账号",
+      "success": "注册成功，请登录。",
+      "failedTitle": "注册失败",
+      "failedRetry": "注册失败，请稍后重试。",
+      "fillRequired": "必填项未填写完整，请先补全。",
+      "passwordNotMatch": "两次输入的密码不一致",
+      "agreePrefix": "创建账号即表示你同意",
+      "agreeAnd": "以及"
+    },
+    "billing": {
+      "title": "套餐与账单",
+      "upgrade": "升级到专业版"
+    },
+    "settings": {
+      "title": "系统设置",
+      "description": "管理后台账号偏好、界面主题和通知选项。",
+      "profile": {
+        "title": "个人资料",
+        "description": "维护当前后台账号的头像和昵称。",
+        "basicTitle": "基础资料",
+        "basicDescription": "保存后会立即同步到当前登录态和侧边栏用户信息。",
+        "avatar": "头像",
+        "avatarTips": "支持 jpeg、jpg、svg、png、webp，单张不超过 1MB",
+        "userName": "昵称",
+        "userNamePlaceholder": "请输入昵称",
+        "account": "登录账号",
+        "role": "角色",
+        "save": "保存资料",
+        "saveSuccess": "个人资料已更新",
+        "saveFailed": "个人资料更新失败"
+      },
+      "account": {
+        "title": "账户设置",
+        "description": "管理后台账号的默认语言和登录密码。",
+        "languageTitle": "默认语言",
+        "languageDescription": "语言偏好会保存在当前浏览器，下次登录时默认继续使用。",
+        "languageLabel": "界面语言",
+        "languagePlaceholder": "请选择默认语言",
+        "saveLanguage": "保存语言设置",
+        "languageSaved": "默认语言已保存",
+        "passwordTitle": "修改密码",
+        "passwordDescription": "请输入当前密码，并设置新的后台登录密码。",
+        "oldPassword": "旧密码",
+        "oldPasswordPlaceholder": "请输入旧密码",
+        "newPassword": "新密码",
+        "newPasswordPlaceholder": "请输入新密码",
+        "checkPassword": "确认新密码",
+        "checkPasswordPlaceholder": "请再次输入新密码",
+        "savePassword": "保存新密码",
+        "passwordSaved": "密码修改成功",
+        "passwordSaveFailed": "密码修改失败"
+      },
+      "appearancePreferences": {
+        "title": "外观偏好",
+        "description": "配置当前浏览器中的管理端外观偏好，修改后会自动保存。",
+        "resetDefaults": "恢复默认",
+        "shortcut": "管理端外观偏好",
+        "shortcutTitle": "外观偏好",
+        "shortcutDescription": "快速调整管理端主题、布局和菜单风格。",
+        "openFullSettings": "打开完整设置",
+        "savedHint": "偏好会自动保存到当前浏览器。",
+        "themeSection": "主题",
+        "themeDescription": "选择明暗模式、shadcn 配色、圆角和管理端字体。",
+        "colorMode": "明暗模式",
+        "font": "字体",
+        "fontPlaceholder": "请选择字体",
+        "palette": "配色",
+        "radius": "圆角",
+        "componentStyle": "组件风格",
+        "componentStyleHint": "这是运行时外观预设，不会改写 components.json 或已生成的组件源码。",
+        "layoutSection": "布局与导航",
+        "layoutDescription": "调整管理端内容宽度、菜单交互和侧边栏初始状态。",
+        "contentLayout": "内容布局",
+        "menuStyle": "菜单风格",
+        "sidebarStartup": "侧边栏初始状态",
+        "sidebarStartupPlaceholder": "请选择初始状态",
+        "displaySection": "显示效果",
+        "displayDescription": "调整适合高密度后台工作的动效和页面辅助元素。",
+        "density": "界面密度",
+        "densityPlaceholder": "请选择界面密度",
+        "reduceMotion": "减少动效",
+        "reduceMotionDescription": "关闭非必要过渡和动画。",
+        "stripedTables": "表格斑马纹",
+        "stripedTablesDescription": "在支持的管理端表格中显示交替行背景。",
+        "showBreadcrumbs": "显示面包屑",
+        "showBreadcrumbsDescription": "保留页面路径上下文。",
+        "showPageTitles": "显示页面标题",
+        "showPageTitlesDescription": "保留页面标题区域。",
+        "colorModes": {
+          "light": "浅色",
+          "dark": "深色",
+          "system": "跟随系统"
+        },
+        "fonts": {
+          "system": "系统字体",
+          "inter": "Inter",
+          "manrope": "Manrope",
+          "geist": "Geist",
+          "mono": "等宽字体",
+          "serif": "衬线字体"
+        },
+        "componentStyles": {
+          "reka-vega": "Reka Vega",
+          "reka-nova": "Reka Nova",
+          "reka-maia": "Reka Maia",
+          "reka-lyra": "Reka Lyra",
+          "reka-mira": "Reka Mira",
+          "reka-luma": "Reka Luma"
+        },
+        "componentStyleDescriptions": {
+          "reka-vega": "均衡的默认表面和控件层级。",
+          "reka-nova": "更明亮的卡片抬升和清晰控件。",
+          "reka-maia": "更紧凑的边框感，适合高密度页面。",
+          "reka-lyra": "更柔和的面板和轻量阴影。",
+          "reka-mira": "半透明层次和更明显的聚焦状态。",
+          "reka-luma": "高对比、低阴影的直接界面。"
+        },
+        "themes": {
+          "slate": "板岩灰",
+          "gray": "中性灰",
+          "zinc": "锌灰",
+          "neutral": "纯中性",
+          "stone": "石色",
+          "red": "红色",
+          "rose": "玫瑰",
+          "pink": "粉色",
+          "fuchsia": "紫红",
+          "purple": "紫色",
+          "violet": "紫罗兰",
+          "indigo": "靛蓝",
+          "blue": "蓝色",
+          "sky": "天蓝",
+          "cyan": "青色",
+          "teal": "青绿",
+          "emerald": "翠绿",
+          "green": "绿色",
+          "lime": "酸橙",
+          "yellow": "黄色",
+          "amber": "琥珀",
+          "orange": "橙色"
+        },
+        "contentLayouts": {
+          "full": "通栏",
+          "centered": "居中"
+        },
+        "navigationModes": {
+          "collapsible": "折叠菜单",
+          "vercel": "渐进菜单"
+        },
+        "navigationDescriptions": {
+          "collapsible": "使用传统可折叠侧边栏。",
+          "vercel": "使用逐级进入的导航交互。"
+        },
+        "sidebarStates": {
+          "remember": "记住上次状态",
+          "expanded": "默认展开",
+          "collapsed": "默认收起"
+        },
+        "densities": {
+          "comfortable": "舒适",
+          "standard": "标准",
+          "compact": "紧凑"
+        }
+      }
+    },
+    "users": {
+      "title": "用户管理",
+      "description": "管理后台用户账号、角色、状态和密码重置。",
+      "createUser": "创建用户",
+      "createTitle": "新增用户",
+      "editTitle": "编辑用户",
+      "formDescription": "维护账号、昵称、角色、状态与头像等基础资料。",
+      "loadingDetail": "正在加载用户详情...",
+      "filterTitle": "筛选条件",
+      "filterDescription": "支持按昵称、角色和状态筛选后台用户。",
+      "listTitle": "用户列表",
+      "total": "当前共 {total} 个用户。",
+      "loading": "正在加载用户数据...",
+      "empty": "暂无用户数据",
+      "page": "第 {page} / {totalPages} 页",
+      "allRoles": "全部角色",
+      "allStatus": "全部状态",
+      "deleteTitle": "确认删除用户",
+      "deleteDescription": "删除后该用户记录将不可恢复，请确认是否继续。",
+      "confirmDelete": "确认删除",
+      "deleteSuccess": "用户删除成功",
+      "deleteFailed": "用户删除失败",
+      "protectedAdminCannotDelete": "内置超级管理员 sakura 不允许删除",
+      "protectedAdminCannotDisable": "内置超级管理员 sakura 不允许禁用",
+      "createSuccess": "用户创建成功，默认密码为 12345678",
+      "updateSuccess": "用户更新成功",
+      "saveFailed": "用户保存失败",
+      "resetPassword": "重置密码",
+      "resetPasswordTitle": "确认重置密码",
+      "resetPasswordDescription": "重置后用户密码将恢复为默认密码 12345678，请确认是否继续。",
+      "confirmResetPassword": "确认重置",
+      "resetPasswordSuccess": "密码已重置为默认密码 12345678",
+      "resetPasswordFailed": "重置密码失败",
+      "enableUser": "启用",
+      "disableUser": "禁用",
+      "toggleStatusTitle": "确认变更用户状态",
+      "enableDescription": "启用后该用户可以正常登录并访问系统。",
+      "disableDescription": "禁用后该用户将无法继续登录系统。",
+      "confirmEnable": "确认启用",
+      "confirmDisable": "确认禁用",
+      "toggleStatusSuccess": "用户状态更新成功",
+      "toggleStatusFailed": "用户状态更新失败",
+      "columns": {
+        "userAccount": "账号",
+        "userName": "昵称",
+        "userAvatar": "头像",
+        "userProfile": "简介",
+        "status": "状态",
+        "userRole": "角色",
+        "updateTime": "更新时间",
+        "remark": "备注"
+      },
+      "roles": {
+        "admin": "管理员",
+        "user": "普通用户"
+      },
+      "form": {
+        "accountPlaceholder": "请输入登录账号",
+        "namePlaceholder": "请输入用户昵称",
+        "avatarPlaceholder": "支持 jpeg、jpg、svg、png、webp，单张不超过 1MB",
+        "profilePlaceholder": "请输入用户简介",
+        "rolePlaceholder": "请选择用户角色",
+        "statusPlaceholder": "请选择用户状态",
+        "searchNamePlaceholder": "按昵称模糊查询",
+        "accountRequired": "请输入用户账号",
+        "roleRequired": "请选择用户角色"
+      }
+    },
+    "home": {
+      "badge": "AI 图文创作平台",
+      "title": "Sakura Passage AI，让智能体协作完成图文创作。",
+      "description": "这是一套以 AI 智能体协作和多模态内容生成为核心的平台教程，基于 Spring Boot 3、Spring AI Alibaba 与 Vue3 构建。",
+      "startCreation": "进入创作台",
+      "enterAdmin": "进入后台",
+      "guideTitle": "平台说明",
+      "guideDesc": "用户端聚焦 AI 图文创作入口，后台用于维护用户、系统配置和后续创作资源。",
+      "userLoginPath": "用户端登录入口：`/auth/sign-in`",
+      "adminLoginPath": "统一登录入口：`/auth/sign-in`",
+      "accessNote": "统一认证返回后，是否允许进入后台由角色权限决定。",
+      "recentTitle": "能力预览",
+      "metrics": {
+        "workflow": "智能体工作流",
+        "workflowHint": "支持多步骤任务编排",
+        "imageModes": "配图方式",
+        "imageModesHint": "包括 Nano Banana Pro",
+        "content": "多模态创作",
+        "contentHint": "文章、提示词和图片一体生成"
+      },
+      "features": {
+        "agentTitle": "AI 智能体协作",
+        "agentDesc": "围绕选题、成文、润色和配图构建可编排创作链路。",
+        "imageTitle": "7 种配图方式",
+        "imageDesc": "覆盖文生图、图生图、多模型配图和 Nano Banana Pro。",
+        "adminTitle": "后台协同",
+        "adminDesc": "具备后台角色时，可直接切换到管理端维护平台配置和创作资源。"
+      },
+      "highlights": {
+        "workflowTitle": "智能体工作流教程",
+        "workflowContent": "演示从选题、生成正文到自动配图的完整协作链路。",
+        "workflowTime": "10 分钟前",
+        "imageTitle": "多模态生成能力",
+        "imageContent": "逐步接入 7 种配图方式，方便对比不同生成策略。",
+        "imageTime": "今天 09:20",
+        "configTitle": "后台配置入口",
+        "configContent": "管理员可维护系统配置、用户和后续创作资源。",
+        "configTime": "今天 08:00"
+      }
+    },
+    "login": {
+      "title": "用户端登录",
+      "description": "统一登录后根据账号角色自动跳转，适合快速开发 Web 应用的前后台一体化模板。",
+      "failedTitle": "登录失败",
+      "failedRetry": "登录失败，请稍后重试。",
+      "emailPlaceholder": "请输入登录账号",
+      "passwordPlaceholder": "12345678",
+      "enterUser": "进入用户端",
+      "demoTip": "默认密码需满足后端最小 8 位要求，示例账号会显示在登录表单中。",
+      "noAccount": "还没有账号？",
+      "toSignUp": "去注册",
+      "agreePrefix": "登录即表示你同意",
+      "agreeAnd": "以及",
+      "fillRequired": "必填项未填写完整，请先补全。"
+    },
+    "authPortal": {
+      "user": {
+        "badge": "SAKURA PASSAGE AI",
+        "title": "登录创作平台",
+        "description": "输入账户和密码进入 AI 图文创作平台，系统会根据账号角色自动分流。",
+        "submit": "进入平台",
+        "heroTitle": "以智能体协作为核心的 AI 图文创作平台。",
+        "heroDescription": "统一登录、角色分流和后台基础能力已经内置，后续可继续接入文章生成、工作流编排和多模态配图。",
+        "features": {
+          "creation": "用户端聚焦图文创作入口，承载后续文章生成和配图工作流。",
+          "resources": "后台基础模块覆盖用户、字典、协议等常见管理能力。",
+          "switchAdmin": "统一认证和角色分流已接入，后续只需扩展创作业务权限。"
+        }
+      },
+      "admin": {
+        "badge": "ADMIN CONSOLE",
+        "title": "登录应用平台",
+        "description": "输入账户和密码进入平台，系统会根据账号角色自动分流到前台应用或后台管理端。",
+        "submit": "进入后台",
+        "heroTitle": "从统一认证开始，快速搭建前后台一体的 Web 应用。",
+        "heroDescription": "平台提供登录、权限分流、后台布局和基础业务管理模块，减少重复搭建成本。",
+        "features": {
+          "dashboard": "管理员登录成功后默认进入后台工作台，适合继续处理基础管理与业务配置。",
+          "permission": "是否允许进入后台仍由账号角色决定，统一认证不会放宽原有权限边界。",
+          "switchUser": "后台顶部保留“去前台”按钮，方便在管理端和前台应用之间快速切换。"
+        }
+      }
+    },
+    "dicts": {
+      "title": "字典管理",
+      "description": "维护系统字典类型与字典数据的基础信息。",
+      "typeTitle": "字典类型",
+      "itemTitle": "字典明细",
+      "typeTotal": "当前共 {total} 个字典类型。",
+      "itemTotal": "当前类型「{name}」下共 {total} 条明细。",
+      "selectTypeFirst": "请先选择一个字典类型后再管理明细。",
+      "allStatus": "全部状态",
+      "loadingTypes": "正在加载字典类型...",
+      "loadingItems": "正在加载字典明细...",
+      "loadingTypeDetail": "正在加载字典类型详情...",
+      "loadingItemDetail": "正在加载字典明细详情...",
+      "emptyTypes": "暂无字典类型数据",
+      "emptyItems": "当前字典类型下暂无明细数据",
+      "page": "第 {page} / {totalPages} 页",
+      "createType": "新增类型",
+      "createItem": "新增明细",
+      "createTypeTitle": "新增字典类型",
+      "editTypeTitle": "编辑字典类型",
+      "createItemTitle": "新增字典明细",
+      "editItemTitle": "编辑字典明细",
+      "typeCreateSuccess": "字典类型创建成功",
+      "typeUpdateSuccess": "字典类型更新成功",
+      "typeSaveFailed": "字典类型保存失败",
+      "typeDeleteSuccess": "字典类型删除成功",
+      "typeDeleteFailed": "字典类型删除失败",
+      "itemCreateSuccess": "字典明细创建成功",
+      "itemUpdateSuccess": "字典明细更新成功",
+      "itemSaveFailed": "字典明细保存失败",
+      "itemDeleteSuccess": "字典明细删除成功",
+      "itemDeleteFailed": "字典明细删除失败",
+      "deleteTypeTitle": "确认删除字典类型",
+      "deleteTypeDescription": "删除前若仍存在字典明细，后端会拦截该操作。",
+      "confirmDeleteType": "确认删除",
+      "deleteItemTitle": "确认删除字典明细",
+      "deleteItemDescription": "删除后当前字典明细将不可恢复，请确认是否继续。",
+      "confirmDeleteItem": "确认删除",
+      "columns": {
+        "dictCode": "字典编码",
+        "dictName": "字典名称",
+        "dictLabel": "字典标签",
+        "dictValue": "字典值",
+        "sortOrder": "排序值",
+        "status": "状态",
+        "tagType": "标签类型",
+        "remark": "备注",
+        "extJson": "扩展 JSON",
+        "updateTime": "更新时间"
+      },
+      "typeForm": {
+        "description": "维护字典编码、名称、状态和备注。",
+        "codePlaceholder": "请输入字典编码",
+        "namePlaceholder": "请输入字典名称",
+        "statusPlaceholder": "请选择状态",
+        "remarkPlaceholder": "请输入备注信息",
+        "codeRequired": "请输入字典编码",
+        "nameRequired": "请输入字典名称"
+      },
+      "itemForm": {
+        "description": "当前明细会自动绑定到已选中的字典类型。",
+        "labelPlaceholder": "请输入字典标签",
+        "valuePlaceholder": "请输入字典值",
+        "statusPlaceholder": "请选择状态",
+        "tagTypePlaceholder": "请选择标签类型",
+        "tagTypeNone": "不设置，使用默认样式",
+        "tagPreview": "标签预览",
+        "tagPreviewText": "标签效果",
+        "remarkPlaceholder": "请输入备注信息",
+        "extJsonPlaceholder": "请输入扩展 JSON 文本",
+        "typeRequired": "请先选择字典类型",
+        "labelRequired": "请输入字典标签",
+        "valueRequired": "请输入字典值"
+      }
+    },
+    "agreements": {
+      "title": "协议管理",
+      "description": "维护用户协议、隐私协议等富文本内容。",
+      "filterTitle": "筛选条件",
+      "type": "协议类型",
+      "allTypes": "全部类型",
+      "titleLabel": "协议标题",
+      "titlePlaceholder": "请输入协议标题",
+      "status": "状态",
+      "allStatus": "全部状态",
+      "listTitle": "协议列表",
+      "total": "当前共 {total} 条协议记录。",
+      "loading": "正在加载协议数据...",
+      "sortOrder": "排序值",
+      "updatedAt": "更新时间",
+      "empty": "暂无协议数据",
+      "page": "第 {page} / {totalPages} 页",
+      "deleteTitle": "确认删除协议",
+      "deleteDesc": "删除后当前协议内容将不可恢复，请确认是否继续。",
+      "confirmDelete": "确认删除",
+      "deleteSuccess": "协议删除成功",
+      "deleteFailed": "删除失败"
+    },
+    "help": {
+      "title": "帮助中心",
+      "description": "查看帮助资源与社区渠道。",
+      "alertTitle": "提示",
+      "alertDesc": "你可以在帮助中心中找到常见问题的答案。",
+      "accounts": {
+        "github": "项目源码或教程资料可在后续配置的 GitHub 仓库中查看。",
+        "discord": "加入我们的 Discord 社区，提问、分享项目并参与交流。",
+        "bilibili": "在哔哩哔哩上找到我们。"
+      }
+    }
+  },
+  "premium": {
+    "premium": "会员计划",
+    "UpgradeNow": "现在升级"
+  },
+  "marketing": {
+    "hero": {
+      "learnPeople": "超过 1K+ 人加入",
+      "getMore": "获取更多",
+      "title": "每个0.01%的进化都在熔铸命运的质变，敢不敢用365天见证脱胎换骨？",
+      "subtitle": "时光沙漏正迸发着惊雷，当量变冲破临界点，你埋首耕耘的每个晨昏都将化作星辰大海！"
+    },
+    "features": {
+      "title": "功能",
+      "feature1": {
+        "title": "使用现代技术",
+        "description": "更加现代化的组件库，自由定制每一个组件"
+      },
+      "feature2": {
+        "title": "部署简单",
+        "description": "一键部署到您的服务器，无需复杂的配置"
+      },
+      "feature3": {
+        "title": "代码开源",
+        "description": "每一行代码都是开源的，您可以自由地修改和扩展"
+      },
+      "feature4": {
+        "title": "社区支持",
+        "description": "你可以在社区中找到帮助，也可以分享你的经验"
+      }
+    },
+    "evaluation": {
+      "title": "评价",
+      "subtitle": "这些评价都是模拟数据，并非实际数据"
+    },
+    "pricingPlans": {
+      "title": "定价计划",
+      "subtitle": "选择最适合你的计划",
+      "buy": "立即购买",
+      "hobby": {
+        "title": "业余爱好者",
+        "description": "三年提高技能",
+        "price": "399",
+        "discount": "599",
+        "unit": "¥",
+        "billing": {
+          "cycle": "",
+          "period": ""
+        },
+        "features": {
+          "feature1": "使用网站部分代码",
+          "feature2": "获取最新的技术更新",
+          "feature3": "超过 100 个组件",
+          "feature4": "超过 100 个页面"
+        }
+      },
+      "starter": {
+        "title": "入门计划",
+        "description": "五年提高技能",
+        "price": "599",
+        "discount": "899",
+        "unit": "¥",
+        "billing": {
+          "cycle": "",
+          "period": ""
+        },
+        "features": {
+          "feature1": "使用网站全部代码",
+          "feature2": "阅读精彩的在线文档",
+          "feature3": "获取最新的技术更新",
+          "feature4": "超过 200 个组件",
+          "feature5": "超过 200 个页面"
+        }
+      },
+      "business": {
+        "title": "商务计划",
+        "description": "十年提高技能",
+        "price": "199",
+        "discount": "399",
+        "unit": "$",
+        "billing": {
+          "cycle": "",
+          "period": ""
+        },
+        "features": {
+          "feature1": "使用网站全部代码",
+          "feature2": "阅读精彩的在线文档",
+          "feature3": "获取最新的技术更新",
+          "feature4": "超过 200 个组件",
+          "feature5": "超过 200 个页面",
+          "feature6": "私人助理支持"
+        }
+      }
+    },
+    "setup": {
+      "title": "快速开始",
+      "subtitle": "只需 3 分钟即可开始使用"
+    }
+  }
+}
