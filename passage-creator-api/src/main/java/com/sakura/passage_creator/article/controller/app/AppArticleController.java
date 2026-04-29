@@ -39,9 +39,9 @@ public class AppArticleController {
     /**
      * 创建文章任务，启动标题生成异步任务，返回 taskId
      */
-    @PostMapping("/article/create")
+    @PostMapping("/create")
     public BaseResponse<String> createArticleTask(@RequestBody @Valid ArticleCreateRequest request) {
-        
+
         LoginUserInfo loginUser = LoginUserContext.getLoginUser();
 
         // 创建文章

@@ -12,11 +12,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 标题生成Agent
@@ -27,36 +25,6 @@ import java.util.Map;
 @Component
 @Slf4j
 public class TitleGeneratorAgent {
-
-    String AGENT1_TITLE_PROMPT = """
-            你是一位爆款文章标题专家,擅长创作吸引人的标题。
-            
-            根据用户给出的选择内容,生成 3-5 个爆款文章标题方案:
-            
-            要求:
-            1. 每个方案包含主标题和副标题
-            2. 主标题要包含数字、情绪化词汇,吸引眼球
-            3. 副标题要补充说明,增强吸引力
-            4. 标题要简洁有力,不超过30字
-            5. 不同方案要有不同的切入角度
-            6. 符合新媒体爆款文章的风格
-            
-            请直接返回 JSON 格式,不要有其他内容:
-            [
-              {
-                "mainTitle": "主标题1",
-                "subTitle": "副标题1"
-              },
-              {
-                "mainTitle": "主标题2",
-                "subTitle": "副标题2"
-              },
-              {
-                "mainTitle": "主标题3",
-                "subTitle": "副标题3"
-              }
-            ]
-            """;
 
     /**
      * DashScope 聊天模型。
@@ -83,11 +51,10 @@ public class TitleGeneratorAgent {
     public void generatorTitle(ArticleState state) {
         log.info("阶段1：开始生成标题方案, taskId={}", state.getTaskId());
         String topic = state.getTopic();
-        PromptTemplate promptTemplate = new PromptTemplate(PromptConstant.AGENT1_TITLE_PROMPT);
+       
+        String promptText = PromptConstant.AGENT1_TITLE_PROMPT.replace("{topic}", topic);
+        Prompt prompt = new Prompt(promptText);
 
-        Prompt prompt = promptTemplate.create(Map.of(
-                "topic", topic
-        ));
         ChatResponse chatResponse = chatModel.call(prompt);
         // 转换 todo code可能返回错误，需要校验
         String response = chatResponse.getResult().getOutput().getText();
