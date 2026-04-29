@@ -1,0 +1,43 @@
+# 开发环境配置文件
+# @author sakura
+# @from sakura
+server:
+  port: 8101
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/sakura_passage_creator
+    username: root
+    password: root
+  data:
+    redis:
+      database: 1
+      host: localhost
+      port: 6379
+      timeout: 5000
+      password:
+  ai:
+    dashscope:
+      api-key: ${DASH_SCOPE_KEY}
+
+mybatis-flex:
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# 数据库预热默认关闭，需要时通过 datasource.warmup.enabled=true 显式开启。
+datasource:
+  warmup:
+    enabled: true
+
+# 日志配置
+logging:
+  level:
+    #    mybatis-flex 日志配置
+    com.sakura.passage_creator.user.repository: debug
+    com.sakura.passage_creator.article.repository: debug
+    com.sakura.passage_creator.notification.repository: debug
+    com.sakura.passage_creator.observability.repository: debug
+    com.sakura.passage_creator.agreement.repository: debug
+    com.sakura.passage_creator.dict.repository: debug
+    com.sakura.passage_creator.audit.repository: debug

@@ -1,0 +1,26 @@
+# 线上配置文件
+# @author sakura
+# @from sakura
+server:
+  port: 8101
+spring:
+  # 数据库配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 生产环境默认使用容器内服务名
+    url: jdbc:mysql://mysql:3306/my_db
+    username: root
+    password: root
+  # Redis 配置
+  data:
+    redis:
+      database: 1
+      host: redis
+      port: 6379
+      timeout: 5000
+      password:
+
+mybatis-flex:
+  configuration:
+    # 生产环境关闭日志
+    log-impl: ''

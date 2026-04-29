@@ -1,0 +1,149 @@
+# 公共配置文件
+# @author sakura
+# @from sakura
+server:
+  servlet:
+    context-path: /api
+# 开启Gzip压缩
+  compression:
+    enabled: true
+spring:
+  application:
+    name: sakura-boot-init-api
+  modulith:
+    # 仅把显式标注 @ApplicationModule 的包纳入模块图，避免普通目录被误识别为应用模块。
+    detection-strategy: explicitly-annotated
+  messages:
+    basename: messages
+    encoding: UTF-8
+  # 默认 dev 环境
+  profiles:
+    active: dev
+  # 导入后端根目录下的 .env 配置文件
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:.env.${spring.profiles.active}[.properties]
+      - optional:file:.env.local[.properties]
+  # 数据库配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # 启动后保持一定数量的空闲连接，减少首个数据库请求的建连等待。
+      minimum-idle: 5
+      # 控制最大连接数，避免连接池预热后占用过多数据库资源。
+      maximum-pool-size: 10
+      # 获取连接最长等待时间，避免数据库异常时请求长时间阻塞。
+      connection-timeout: 30000
+      # 启动时校验至少一个连接可用，把连接异常暴露在启动阶段。
+      initialization-fail-timeout: 1
+
+  # 文件上传
+  servlet:
+    multipart:
+      # 大小限制
+      max-file-size: 10MB
+  # Redis 配置
+  data:
+    redis:
+      database: 1
+      timeout: 5000
+
+# 数据库预热默认关闭，需要时通过 datasource.warmup.enabled=true 显式开启。
+datasource:
+  warmup:
+    enabled: false
+
+token:
+  header-name: Authorization
+  header-prefix: "Bearer "
+  expire-duration-seconds: 2592000
+  secret-char-source: 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%-+=
+  secret-length: 32
+  compatibility-header-enabled: true
+  compatibility-header-name: "token"
+  redis-token-key-prefix: "login:token:"
+  redis-user-key-prefix: "login:user:"
+  # 登录用户快照缓存前缀，用于减少每次请求的用户表查询。
+  redis-login-user-key-prefix: "login:user-info:"
+  # 登录用户快照缓存有效期，用户更新或删除时会主动清理，TTL 作为兜底。
+  login-user-cache-expire-seconds: 300
+
+mybatis-flex:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    normal-value-of-logic-delete: 0
+    deleted-value-of-logic-delete: 1
+    logic-delete-column: is_delete
+  type-aliases-package: com.sakura.passage_creator.infra.persistence.entity
+# 微信相关
+wx:
+  # 微信公众平台
+  mp:
+    token: ${WX_MP_TOKEN:xxx}
+    aesKey: ${WX_MP_AES_KEY:xxx}
+    appId: ${WX_MP_APP_ID:xxx}
+    secret: ${WX_MP_SECRET:xxx}
+    config-storage:
+      http-client-type: HttpClient
+      key-prefix: wx
+      redis:
+        host: 127.0.0.1
+        port: 6379
+      type: Memory
+  # 微信开放平台
+  open:
+    appId: ${WX_OPEN_APP_ID:xxx}
+    appSecret: ${WX_OPEN_APP_SECRET:xxx}
+# 对象存储
+oss:
+  enable: true
+  # 对应云厂商的站点域名
+  endpoint: oss-cn-shenzhen.aliyuncs.com
+  # 对应云厂商桶的绑定域名
+  domain: ''
+  accessKey: ${OSS_ACCESS_KEY:}
+  secretKey: ${OSS_SECRET_KEY:}
+  # 前缀
+  prefix: 'images/'
+  # 存储空间名/桶名
+  bucketName: sakura-init
+  # 存储区域
+  region: 'oss-cn-shenzhen'
+  # 是否https（Y=是,N=否）
+  isHttps: Y
+  # 桶权限类型(0private 1public 2custom)
+  accessPolicy: 1
+
+#日志配置
+logging:
+  pattern:
+    dateformat: yyyy-MM-dd HH:mm:ss
+
+# Actuator 仅作为后端采集源，前端统一访问 /admin/observability/** 聚合接口。
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+
+# 可观测性与运维面板配置。
+observability:
+  request-monitor-enabled: true
+  slow-api-threshold-millis: 1000
+  login-failure-window-seconds: 600
+  login-failure-ip-threshold: 10
+  login-failure-account-threshold: 10
+  alert-cooldown-seconds: 1800
+  event-retention-days: 30
+  memory-warning-percent: 80
+  memory-critical-percent: 90
+  disk-warning-percent: 80
+  disk-critical-percent: 90
+  cpu-warning-percent: 80
+  cpu-critical-percent: 90
