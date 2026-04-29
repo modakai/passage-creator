@@ -8,7 +8,7 @@ import {
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
-import type { ArticleTitleOption } from '@/services/types/app-article.type'
+import type { AppArticleProgress, ArticlePhase, ArticleTitleOption } from '@/services/types/app-article.type'
 
 import { createAppArticleTask } from '@/services/api/app-article.api'
 import { connectArticleSse } from '@/utils/article-sse'
@@ -20,20 +20,21 @@ const taskId = ref('')
 const titleOptions = ref<ArticleTitleOption[]>([])
 const isCreating = ref(false)
 const isConnected = ref(false)
+const currentPhase = ref<ArticlePhase>('INPUT')
 const selectedStyle = ref<ArticleStyle>('默认')
 const selectedTitleIndex = ref<number | null>(null)
 let closeSse: (() => void) | null = null
 
 const maxTopicLength = 500
 
-const steps = [
-  { title: '生成标题', desc: 'AI 分析选题，生成吸睛标题', active: true },
-  { title: '规划大纲', desc: '构建文章结构，理清脉络', active: false },
-  { title: '撰写正文', desc: '流式生成高质量文章内容', active: false },
-  { title: '分析配图', desc: '智能分析配图需求和位置', active: false },
-  { title: '生成配图', desc: '自动匹配高清无版权图片', active: false },
-  { title: '图文合成', desc: '将配图插入正文，完美呈现', active: false },
-]
+const steps = computed(() => [
+  { title: '生成标题', desc: 'AI 分析选题，生成吸睛标题', active: ['INPUT', 'PENDING', 'TITLE_GENERATING', 'TITLE_SELECTING'].includes(currentPhase.value) },
+  { title: '规划大纲', desc: '构建文章结构，理清脉络', active: ['OUTLINE_GENERATING', 'OUTLINE_EDITING'].includes(currentPhase.value) },
+  { title: '撰写正文', desc: '流式生成高质量文章内容', active: currentPhase.value === 'CONTENT_GENERATING' },
+  { title: '分析配图', desc: '当前版本暂不启用配图', active: false },
+  { title: '生成配图', desc: '当前版本暂不启用配图', active: false },
+  { title: '图文合成', desc: '正文完成后展示结果', active: currentPhase.value === 'COMPLETED' },
+])
 
 const hotTopics = [
   '2026年AI如何改变职场',
@@ -55,6 +56,55 @@ const imageOptions = ['Pexels', 'Nano Banana', 'Mermaid', 'Iconify', '表情包'
 
 const topicLength = computed(() => topic.value.length)
 const canCreate = computed(() => topic.value.trim().length > 0 && !isCreating.value)
+const isInputPhase = computed(() => currentPhase.value === 'INPUT' && !taskId.value)
+const isTitleGenerating = computed(() =>
+  Boolean(taskId.value) && ['PENDING', 'TITLE_GENERATING'].includes(currentPhase.value),
+)
+const isTitleSelecting = computed(() =>
+  currentPhase.value === 'TITLE_SELECTING' || titleOptions.value.length > 0,
+)
+const stepperValue = computed(() => {
+  if (['OUTLINE_GENERATING', 'OUTLINE_EDITING'].includes(currentPhase.value)) {
+    return 2
+  }
+  if (currentPhase.value === 'CONTENT_GENERATING') {
+    return 3
+  }
+  if (currentPhase.value === 'COMPLETED') {
+    return 6
+  }
+  return 1
+})
+
+/**
+ * 后端存储的是 JSON 字符串，前端收到进度快照时统一解析成标题候选数组。
+ */
+function parseTitleOptions(value?: string) {
+  if (!value) {
+    return []
+  }
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed as ArticleTitleOption[] : []
+  }
+  catch {
+    return []
+  }
+}
+
+/**
+ * 使用进度快照恢复当前页面状态，支持刷新页面或重新连接 SSE。
+ */
+function applyProgress(progress: AppArticleProgress) {
+  currentPhase.value = progress.phase ?? 'PENDING'
+  taskId.value = progress.taskId
+  topic.value = progress.topic
+  const options = parseTitleOptions(progress.titleOptions)
+  if (options.length > 0) {
+    titleOptions.value = options
+  }
+  isCreating.value = ['PENDING', 'TITLE_GENERATING'].includes(progress.phase ?? 'PENDING')
+}
 
 /**
  * 首页带入选题时，直接填充到第一步输入框。
@@ -94,6 +144,7 @@ async function handleCreateTask() {
   closeCurrentSse()
   titleOptions.value = []
   selectedTitleIndex.value = null
+  currentPhase.value = 'TITLE_GENERATING'
   isCreating.value = true
 
   try {
@@ -103,19 +154,26 @@ async function handleCreateTask() {
 
     closeSse = connectArticleSse(response.data, {
       onMessage(message) {
+        if (message.type === 'PROGRESS') {
+          applyProgress(message.data as AppArticleProgress)
+        }
+
         if (message.type === 'TITLES_GENERATED') {
           titleOptions.value = (message.data ?? []) as ArticleTitleOption[]
+          currentPhase.value = 'TITLE_SELECTING'
           isCreating.value = false
           toast.success('标题方案已生成')
         }
 
         if (message.type === 'ERROR') {
+          currentPhase.value = 'FAILED'
           isCreating.value = false
           isConnected.value = false
           toast.error(message.message || '文章生成失败')
         }
       },
       onError(error) {
+        currentPhase.value = 'FAILED'
         isCreating.value = false
         isConnected.value = false
         const message = error instanceof Error ? error.message : 'SSE 连接异常'
@@ -124,6 +182,7 @@ async function handleCreateTask() {
     })
   }
   catch (error: any) {
+    currentPhase.value = 'INPUT'
     isCreating.value = false
     const message = error?.data?.message ?? error?.message ?? '创建文章任务失败'
     toast.error(message)
@@ -146,7 +205,7 @@ onUnmounted(() => {
           </UiCardHeader>
 
           <UiCardContent class="px-0">
-            <UiStepper :model-value="1" orientation="vertical" class="flex-col items-start gap-0">
+            <UiStepper :model-value="stepperValue" orientation="vertical" class="flex-col items-start gap-0">
               <UiStepperItem
                 v-for="(step, index) in steps"
                 :key="step.title"
@@ -179,7 +238,7 @@ onUnmounted(() => {
 
       <section class="flex justify-center px-4 py-10 sm:px-8 lg:py-24">
         <div class="w-full max-w-[780px]">
-          <UiCard class="rounded-2xl border-0 bg-muted/40 shadow-sm">
+          <UiCard v-if="isInputPhase" class="rounded-2xl border-0 bg-muted/40 shadow-sm">
             <UiCardHeader class="items-center px-6 py-10 text-center sm:px-12">
               <UiBadge variant="secondary" class="mb-2 gap-2 bg-emerald-50 text-emerald-600">
                 <SparklesIcon class="size-4" />
@@ -281,7 +340,51 @@ onUnmounted(() => {
             </UiCardContent>
           </UiCard>
 
-          <UiCard v-if="titleOptions.length > 0" class="mt-8">
+          <UiCard v-else-if="isTitleGenerating" class="rounded-2xl border-0 bg-muted/40 shadow-sm">
+            <UiCardHeader class="items-center px-6 py-10 text-center sm:px-12">
+              <UiBadge variant="secondary" class="mb-2 gap-2 bg-emerald-50 text-emerald-600">
+                <LoaderCircleIcon class="size-4 animate-spin" />
+                第一步：生成标题
+              </UiBadge>
+              <UiCardTitle class="text-3xl font-bold tracking-tight sm:text-4xl">
+                正在生成标题
+              </UiCardTitle>
+              <UiCardDescription class="text-base">
+                AI 正在分析选题，请稍候
+              </UiCardDescription>
+            </UiCardHeader>
+
+            <UiCardContent class="space-y-6 px-6 pb-8 sm:px-12">
+              <UiCard>
+                <UiCardContent class="space-y-5 p-6">
+                  <div class="flex items-start gap-4">
+                    <UiSpinner class="mt-1 size-6 text-emerald-600" />
+                    <div class="min-w-0">
+                      <div class="font-semibold">
+                        {{ topic }}
+                      </div>
+                      <p class="mt-2 text-sm leading-6 text-muted-foreground">
+                        正在生成 3-5 个爆款标题方案，完成后会自动切换到标题候选。
+                      </p>
+                    </div>
+                  </div>
+                  <UiProgress :model-value="45" />
+                </UiCardContent>
+              </UiCard>
+
+              <UiAlert v-if="taskId">
+                <UiAlertTitle>任务进行中</UiAlertTitle>
+                <UiAlertDescription>
+                  任务 ID：{{ taskId }}
+                  <UiBadge variant="outline" class="ml-2">
+                    {{ isConnected ? 'SSE 已连接' : 'SSE 连接中' }}
+                  </UiBadge>
+                </UiAlertDescription>
+              </UiAlert>
+            </UiCardContent>
+          </UiCard>
+
+          <UiCard v-else-if="isTitleSelecting" class="rounded-2xl border-0 bg-muted/40 shadow-sm">
             <UiCardHeader class="flex flex-row items-center justify-between gap-3">
               <div>
                 <UiCardTitle>
@@ -316,6 +419,18 @@ onUnmounted(() => {
                   {{ item.subTitle }}
                 </UiCardContent>
               </UiCard>
+            </UiCardContent>
+          </UiCard>
+
+          <UiCard v-else class="rounded-2xl border-0 bg-muted/40 shadow-sm">
+            <UiCardHeader>
+              <UiCardTitle>创作任务异常</UiCardTitle>
+              <UiCardDescription>请返回输入阶段后重试。</UiCardDescription>
+            </UiCardHeader>
+            <UiCardContent>
+              <UiButton @click="currentPhase = 'INPUT'; taskId = ''; titleOptions = []">
+                重新开始
+              </UiButton>
             </UiCardContent>
           </UiCard>
         </div>

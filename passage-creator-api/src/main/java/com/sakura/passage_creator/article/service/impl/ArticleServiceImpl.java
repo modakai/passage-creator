@@ -102,6 +102,17 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     }
 
     @Override
+    public Article getAccessibleArticleByTaskId(String taskId, LoginUserInfo loginUser) {
+        assertLogin(loginUser);
+        ThrowUtils.throwIf(StringUtils.isBlank(taskId), ErrorCode.PARAMS_ERROR, "任务 id 不能为空");
+        Article article = this.getOne(QueryWrapper.create()
+                .where(ARTICLE.TASK_ID.eq(taskId)));
+        ThrowUtils.throwIf(article == null, ErrorCode.NOT_FOUND_ERROR);
+        assertArticleAccessible(article, loginUser);
+        return article;
+    }
+
+    @Override
     public QueryWrapper getQueryWrapper(ArticleQueryRequest queryRequest, LoginUserInfo loginUser) {
         assertLogin(loginUser);
         if (queryRequest == null) {
@@ -158,7 +169,10 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
 
     @Override
     public String createArticle(String topic, LoginUserInfo loginUser) {
-        // 使用 uuid 生成 topic
+        assertLogin(loginUser);
+        ThrowUtils.throwIf(StringUtils.isBlank(topic), ErrorCode.PARAMS_ERROR, "文章选题不能为空");
+        ThrowUtils.throwIf(topic.length() > 500, ErrorCode.PARAMS_ERROR, "文章选题不能超过 500 个字符");
+        // 使用 UUID 生成对外任务 id，避免暴露数据库自增主键。
         String taskId = UUID.randomUUID().toString();
         Article article = new Article();
         article.setUserId(loginUser.userId());

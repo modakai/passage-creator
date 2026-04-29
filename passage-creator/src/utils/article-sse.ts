@@ -34,7 +34,7 @@ export function connectArticleSse(taskId: string, options: ConnectArticleSseOpti
 
   async function connect() {
     try {
-      const response = await fetch(`${API_BASE_URL}/app/article/sse/${encodeURIComponent(taskId)}`, {
+      const response = await fetch(`${API_BASE_URL}/app/article/progress/${encodeURIComponent(taskId)}`, {
         method: 'GET',
         headers,
         signal: controller.signal,

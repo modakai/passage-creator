@@ -12,6 +12,11 @@ import lombok.Getter;
 public enum SseMessageTypeEnum {
 
     /**
+     * 当前文章任务快照，SSE 连接建立后用于恢复页面状态。
+     */
+    PROGRESS("PROGRESS", "文章任务进度"),
+
+    /**
      * 标题方案已生成，等待用户选择标题。
      */
     TITLES_GENERATED("TITLES_GENERATED", "标题方案已生成"),

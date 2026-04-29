@@ -8,7 +8,7 @@ import { useApiFetch } from '@/composables/use-fetch'
  */
 export async function createAppArticleTask(data: AppArticleCreateRequest) {
   const { apiFetch } = useApiFetch()
-  return await apiFetch<IResponse<string>>('/app/article/article/create', {
+  return await apiFetch<IResponse<string>>('/app/article/create', {
     method: 'post',
     body: data,
   })

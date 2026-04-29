@@ -75,6 +75,21 @@ public class ArticleVO implements Serializable {
     private String status;
 
     /**
+     * 当前创作阶段。
+     */
+    private String phase;
+
+    /**
+     * AI 生成的标题候选 JSON 数组文本。
+     */
+    private String titleOptions;
+
+    /**
+     * 用户选择标题后补充的创作要求。
+     */
+    private String userDescription;
+
+    /**
      * 错误信息。
      */
     private String errorMessage;
