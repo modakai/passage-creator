@@ -2,6 +2,8 @@ package com.sakura.passage_creator.article.controller.app;
 
 import cn.hutool.json.JSONUtil;
 import com.sakura.passage_creator.article.manager.SseEmitterManager;
+import com.sakura.passage_creator.article.model.dto.ArticleConfirmOutlineRequest;
+import com.sakura.passage_creator.article.model.dto.ArticleConfirmTitleRequest;
 import com.sakura.passage_creator.article.model.dto.ArticleCreateRequest;
 import com.sakura.passage_creator.article.model.dto.SseMessage;
 import com.sakura.passage_creator.article.model.entity.Article;
@@ -15,6 +17,7 @@ import com.sakura.passage_creator.shared.common.ResultUtils;
 import com.sakura.passage_creator.shared.context.LoginUserContext;
 import com.sakura.passage_creator.shared.context.LoginUserInfo;
 import com.sakura.passage_creator.shared.exception.ThrowUtils;
+import io.github.linpeilie.Converter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -44,6 +47,8 @@ public class AppArticleController {
 
     private final SseEmitterManager sseEmitterManager;
 
+    private final Converter converter;
+
     /**
      * 创建文章任务，启动标题生成异步任务，返回 taskId
      */
@@ -59,6 +64,46 @@ public class AppArticleController {
         articleAsyncService.executePhase1(taskId, request.getTopic());
 
         return ResultUtils.success(taskId);
+    }
+
+
+    /**
+     * 确认标题
+     */
+    @PostMapping("/confirm-title")
+    public BaseResponse<Boolean> confirmTitle(@Valid @RequestBody ArticleConfirmTitleRequest request) {
+        // 确认标题入库
+        Article article = converter.convert(request, Article.class);
+        // DTO 使用 selected* 表达前端选择结果，这里显式映射到文章实体标题字段。
+        article.setMainTitle(request.getSelectedMainTitle());
+        article.setSubTitle(request.getSelectedSubTitle());
+        LoginUserInfo loginUser = LoginUserContext.getLoginUser();
+        Long userId = loginUser.userId();
+        article.setUserId(userId);
+        boolean flag = articleService.confirmTitle(article);
+        if (!flag) return ResultUtils.success(false);
+
+        // 异步生成大纲
+        articleAsyncService.executePhase2(article.getTaskId(), article.getMainTitle(),
+                article.getSubTitle(), article.getUserDescription());
+
+        return ResultUtils.success(true);
+    }
+
+    /**
+     * 确认标题
+     */
+    @PostMapping("/confirm-outline")
+    public BaseResponse<Boolean> confirmOutline(@Valid @RequestBody ArticleConfirmOutlineRequest request) {
+
+        boolean flag = articleService.confirmOutline(request.getTaskId(), request.getOutline());
+
+        if (!flag) return ResultUtils.success(flag);
+
+        // 生成正文
+        articleAsyncService.executePhase3(request.getTaskId(), request.getOutline());
+
+        return ResultUtils.success(true);
     }
 
     /**

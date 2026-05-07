@@ -1,16 +1,36 @@
 <script setup lang="ts">
 import {
+  CheckCircle2Icon,
+  ClipboardCheckIcon,
+  ClipboardIcon,
   CrownIcon,
+  FileTextIcon,
   LightbulbIcon,
   LoaderCircleIcon,
+  PenLineIcon,
+  PlusIcon,
   RocketIcon,
   SparklesIcon,
+  Trash2Icon,
 } from '@lucide/vue'
+import { useClipboard } from '@vueuse/core'
 import { toast } from 'vue-sonner'
 
-import type { AppArticleProgress, ArticlePhase, ArticleTitleOption } from '@/services/types/app-article.type'
+import type {
+  AppArticleProgress,
+  ArticleOutlineResult,
+  ArticleOutlineSection,
+  ArticlePhase,
+  ArticleSseMessage,
+  ArticleTitleOption,
+} from '@/services/types/app-article.type'
 
-import { createAppArticleTask } from '@/services/api/app-article.api'
+import {
+  confirmAppArticleOutline,
+  confirmAppArticleTitle,
+  createAppArticleTask,
+} from '@/services/api/app-article.api'
+import MarkdownContentRenderer from '@/components/article/markdown-content-renderer.vue'
 import { connectArticleSse } from '@/utils/article-sse'
 
 type ArticleStyle = '默认' | '科技风格' | '情感风格' | '教育风格' | '轻松幽默'
@@ -23,6 +43,11 @@ const isConnected = ref(false)
 const currentPhase = ref<ArticlePhase>('INPUT')
 const selectedStyle = ref<ArticleStyle>('默认')
 const selectedTitleIndex = ref<number | null>(null)
+const userDescription = ref('')
+const outlineSections = ref<ArticleOutlineSection[]>([])
+const generatedContent = ref('')
+const isConfirmingTitle = ref(false)
+const isConfirmingOutline = ref(false)
 let closeSse: (() => void) | null = null
 
 const maxTopicLength = 500
@@ -61,8 +86,28 @@ const isTitleGenerating = computed(() =>
   Boolean(taskId.value) && ['PENDING', 'TITLE_GENERATING'].includes(currentPhase.value),
 )
 const isTitleSelecting = computed(() =>
-  currentPhase.value === 'TITLE_SELECTING' || titleOptions.value.length > 0,
+  currentPhase.value === 'TITLE_SELECTING' && titleOptions.value.length > 0,
 )
+const isOutlineGenerating = computed(() => currentPhase.value === 'OUTLINE_GENERATING')
+const isOutlineEditing = computed(() => currentPhase.value === 'OUTLINE_EDITING')
+const isContentGenerating = computed(() => currentPhase.value === 'CONTENT_GENERATING')
+const isCompleted = computed(() => currentPhase.value === 'COMPLETED')
+const selectedTitle = computed(() => {
+  if (selectedTitleIndex.value === null) {
+    return null
+  }
+  return titleOptions.value[selectedTitleIndex.value] ?? null
+})
+const outlineSectionCount = computed(() => outlineSections.value.length)
+const outlinePointCount = computed(() =>
+  outlineSections.value.reduce((total, section) => total + section.points.length, 0),
+)
+const generatedContentLength = computed(() => generatedContent.value.length)
+const {
+  copy: copyGeneratedContent,
+  copied: isGeneratedContentCopied,
+  isSupported: isClipboardSupported,
+} = useClipboard({ source: generatedContent })
 const stepperValue = computed(() => {
   if (['OUTLINE_GENERATING', 'OUTLINE_EDITING'].includes(currentPhase.value)) {
     return 2
@@ -75,6 +120,135 @@ const stepperValue = computed(() => {
   }
   return 1
 })
+
+/**
+ * 解析后端快照中的大纲 JSON 字符串。
+ */
+function parseOutline(value?: string): ArticleOutlineResult | null {
+  if (!value) {
+    return null
+  }
+  try {
+    const parsed = JSON.parse(value) as ArticleOutlineResult
+    return isValidOutline(parsed) ? parsed : null
+  }
+  catch {
+    return null
+  }
+}
+
+/**
+ * 校验大纲结构，避免把错误 JSON 提交给后端正文生成阶段。
+ */
+function isValidOutline(value: unknown): value is ArticleOutlineResult {
+  const outline = value as ArticleOutlineResult
+  return Array.isArray(outline?.sections)
+    && outline.sections.length > 0
+    && outline.sections.every((section: ArticleOutlineSection) =>
+      Number.isFinite(section.section)
+      && typeof section.title === 'string'
+      && section.title.trim().length > 0
+      && Array.isArray(section.points)
+      && section.points.every(point => typeof point === 'string'),
+    )
+}
+
+/**
+ * 根据当前数组下标重排章节序号，避免用户增删后提交跳号。
+ */
+function normalizeOutlineSectionOrder() {
+  outlineSections.value = outlineSections.value.map((section, index) => ({
+    ...section,
+    section: index + 1,
+  }))
+}
+
+/**
+ * 将后端大纲结果转换为结构化编辑状态，用户看到的是章节卡片而不是 JSON。
+ */
+function applyOutlineResult(outline: ArticleOutlineResult) {
+  outlineSections.value = outline.sections.map((section, index) => ({
+    section: index + 1,
+    title: section.title,
+    points: section.points.length > 0 ? [...section.points] : [''],
+  }))
+}
+
+/**
+ * 新增一个空章节，默认给一个要点输入框，降低用户编辑成本。
+ */
+function addOutlineSection() {
+  outlineSections.value.push({
+    section: outlineSections.value.length + 1,
+    title: '新章节',
+    points: [''],
+  })
+}
+
+/**
+ * 删除章节后立即重排序号，保证后端收到的 section 连续。
+ */
+function removeOutlineSection(sectionIndex: number) {
+  if (outlineSections.value.length <= 1) {
+    toast.error('至少保留一个章节')
+    return
+  }
+  outlineSections.value.splice(sectionIndex, 1)
+  normalizeOutlineSectionOrder()
+}
+
+/**
+ * 在指定章节下追加一个新要点。
+ */
+function addOutlinePoint(sectionIndex: number) {
+  outlineSections.value[sectionIndex]?.points.push('')
+}
+
+/**
+ * 删除指定要点，每个章节至少保留一个要点输入框。
+ */
+function removeOutlinePoint(sectionIndex: number, pointIndex: number) {
+  const section = outlineSections.value[sectionIndex]
+  if (!section) {
+    return
+  }
+  if (section.points.length <= 1) {
+    toast.error('每个章节至少保留一个要点')
+    return
+  }
+  section.points.splice(pointIndex, 1)
+}
+
+/**
+ * 将用户编辑界面转换为后端需要的大纲 JSON 结构。
+ */
+function buildOutlineForSubmit(): ArticleOutlineResult | null {
+  const sections = outlineSections.value.map((section, index) => ({
+    section: index + 1,
+    title: section.title.trim(),
+    points: section.points.map(point => point.trim()).filter(Boolean),
+  }))
+
+  const outline: ArticleOutlineResult = { sections }
+  if (!isValidOutline(outline)) {
+    return null
+  }
+  return outline
+}
+
+/**
+ * 组装用户补充要求，把风格选择传给后端大纲生成 Agent。
+ */
+function buildUserDescription() {
+  const parts: string[] = []
+  if (selectedStyle.value !== '默认') {
+    parts.push(`文章风格：${selectedStyle.value}`)
+  }
+  if (userDescription.value.trim()) {
+    parts.push(`补充要求：${userDescription.value.trim()}`)
+  }
+  return parts.join('\n')
+}
 
 /**
  * 后端存储的是 JSON 字符串，前端收到进度快照时统一解析成标题候选数组。
@@ -99,9 +273,14 @@ function applyProgress(progress: AppArticleProgress) {
   currentPhase.value = progress.phase ?? 'PENDING'
   taskId.value = progress.taskId
   topic.value = progress.topic
+  generatedContent.value = progress.content ?? progress.fullContent ?? generatedContent.value
   const options = parseTitleOptions(progress.titleOptions)
   if (options.length > 0) {
     titleOptions.value = options
+  }
+  const outline = parseOutline(progress.outline)
+  if (outline) {
+    applyOutlineResult(outline)
   }
   isCreating.value = ['PENDING', 'TITLE_GENERATING'].includes(progress.phase ?? 'PENDING')
 }
@@ -114,6 +293,7 @@ const initialTopic = route.query.topic
 if (typeof initialTopic === 'string') {
   topic.value = initialTopic.slice(0, maxTopicLength)
 }
+const initialTaskId = typeof route.query.taskId === 'string' ? route.query.taskId.trim() : ''
 
 /**
  * 关闭当前 SSE 连接，避免页面切换后仍接收旧任务消息。
@@ -125,10 +305,102 @@ function closeCurrentSse() {
 }
 
 /**
+ * 清空当前任务状态，用于重新开始或创建新任务前复位。
+ */
+function resetCreatorState() {
+  closeCurrentSse()
+  taskId.value = ''
+  titleOptions.value = []
+  selectedTitleIndex.value = null
+  outlineSections.value = []
+  generatedContent.value = ''
+  isCreating.value = false
+  isConfirmingTitle.value = false
+  isConfirmingOutline.value = false
+  currentPhase.value = 'INPUT'
+}
+
+/**
+ * 统一处理文章任务 SSE 消息，创建任务和 taskId 恢复共用同一套状态推进逻辑。
+ */
+function handleArticleSseMessage(message: ArticleSseMessage) {
+  if (message.type === 'PROGRESS') {
+    applyProgress(message.data as AppArticleProgress)
+  }
+
+  if (message.type === 'TITLES_GENERATED') {
+    titleOptions.value = (message.data ?? []) as ArticleTitleOption[]
+    currentPhase.value = 'TITLE_SELECTING'
+    isCreating.value = false
+    toast.success('标题方案已生成')
+  }
+
+  if (message.type === 'OUTLINE_GENERATED') {
+    applyOutlineResult(message.data as ArticleOutlineResult)
+    currentPhase.value = 'OUTLINE_EDITING'
+    isConfirmingTitle.value = false
+    toast.success('大纲已生成')
+  }
+
+  if (message.type === 'ALL_COMPLETE') {
+    generatedContent.value = String(message.data ?? '')
+    currentPhase.value = 'COMPLETED'
+    isConfirmingOutline.value = false
+    isConnected.value = false
+    toast.success('正文已生成')
+  }
+
+  if (message.type === 'ERROR') {
+    currentPhase.value = 'FAILED'
+    isCreating.value = false
+    isConfirmingTitle.value = false
+    isConfirmingOutline.value = false
+    isConnected.value = false
+    toast.error(String(message.data ?? message.message ?? '文章生成失败'))
+  }
+}
+
+/**
+ * 建立任务进度连接；刷新页面后可通过 taskId 查询参数恢复到对应阶段。
+ */
+function connectTaskProgress(nextTaskId: string) {
+  closeCurrentSse()
+  taskId.value = nextTaskId
+  isConnected.value = true
+
+  closeSse = connectArticleSse(nextTaskId, {
+    onMessage: handleArticleSseMessage,
+    onError(error) {
+      currentPhase.value = 'FAILED'
+      isCreating.value = false
+      isConnected.value = false
+      const message = error instanceof Error ? error.message : 'SSE 连接异常'
+      toast.error(message)
+    },
+  })
+}
+
+/**
  * 使用热门选题填充输入框，降低第一步创作门槛。
  */
 function useHotTopic(value: string) {
   topic.value = value
+}
+
+/**
+ * 复制正文 Markdown 原文，方便用户粘贴到公众号、文档或后续编辑器。
+ */
+async function handleCopyGeneratedContent() {
+  if (!generatedContent.value.trim()) {
+    toast.error('暂无正文可复制')
+    return
+  }
+  if (!isClipboardSupported.value) {
+    toast.error('当前浏览器不支持剪贴板复制')
+    return
+  }
+  await copyGeneratedContent()
+  toast.success('正文 Markdown 已复制')
 }
 
 /**
@@ -144,42 +416,14 @@ async function handleCreateTask() {
   closeCurrentSse()
   titleOptions.value = []
   selectedTitleIndex.value = null
+  outlineSections.value = []
+  generatedContent.value = ''
   currentPhase.value = 'TITLE_GENERATING'
   isCreating.value = true
 
   try {
     const response = await createAppArticleTask({ topic: normalizedTopic })
-    taskId.value = response.data
-    isConnected.value = true
-
-    closeSse = connectArticleSse(response.data, {
-      onMessage(message) {
-        if (message.type === 'PROGRESS') {
-          applyProgress(message.data as AppArticleProgress)
-        }
-
-        if (message.type === 'TITLES_GENERATED') {
-          titleOptions.value = (message.data ?? []) as ArticleTitleOption[]
-          currentPhase.value = 'TITLE_SELECTING'
-          isCreating.value = false
-          toast.success('标题方案已生成')
-        }
-
-        if (message.type === 'ERROR') {
-          currentPhase.value = 'FAILED'
-          isCreating.value = false
-          isConnected.value = false
-          toast.error(message.message || '文章生成失败')
-        }
-      },
-      onError(error) {
-        currentPhase.value = 'FAILED'
-        isCreating.value = false
-        isConnected.value = false
-        const message = error instanceof Error ? error.message : 'SSE 连接异常'
-        toast.error(message)
-      },
-    })
+    connectTaskProgress(response.data)
   }
   catch (error: any) {
     currentPhase.value = 'INPUT'
@@ -189,8 +433,88 @@ async function handleCreateTask() {
   }
 }
 
+/**
+ * 确认选中的标题并进入大纲生成阶段。
+ */
+async function handleConfirmTitle() {
+  if (!taskId.value || !selectedTitle.value) {
+    toast.error('请先选择一个标题方案')
+    return
+  }
+
+  isConfirmingTitle.value = true
+  try {
+    const response = await confirmAppArticleTitle({
+      taskId: taskId.value,
+      selectedMainTitle: selectedTitle.value.mainTitle,
+      selectedSubTitle: selectedTitle.value.subTitle,
+      userDescription: buildUserDescription(),
+    })
+
+    if (!response.data) {
+      throw new Error('标题确认失败，请刷新任务状态后重试')
+    }
+
+    currentPhase.value = 'OUTLINE_GENERATING'
+    toast.success('标题已确认，正在生成大纲')
+  }
+  catch (error: any) {
+    const message = error?.data?.message ?? error?.message ?? '确认标题失败'
+    toast.error(message)
+  }
+  finally {
+    isConfirmingTitle.value = false
+  }
+}
+
+/**
+ * 确认大纲并进入正文生成阶段。
+ */
+async function handleConfirmOutline() {
+  if (!taskId.value) {
+    toast.error('任务 ID 缺失，请重新创建任务')
+    return
+  }
+
+  const outline = buildOutlineForSubmit()
+  if (!outline) {
+    toast.error('请补全章节标题，并为每个章节至少保留一个有效要点')
+    return
+  }
+
+  isConfirmingOutline.value = true
+  try {
+    const response = await confirmAppArticleOutline({
+      taskId: taskId.value,
+      outline,
+    })
+
+    if (!response.data) {
+      throw new Error('大纲确认失败，请确认当前任务处于大纲编辑阶段')
+    }
+
+    currentPhase.value = 'CONTENT_GENERATING'
+    toast.success('大纲已确认，正在生成正文')
+  }
+  catch (error: any) {
+    const message = error?.data?.message ?? error?.message ?? '确认大纲失败'
+    toast.error(message)
+  }
+  finally {
+    isConfirmingOutline.value = false
+  }
+}
+
 onUnmounted(() => {
   closeCurrentSse()
+})
+
+onMounted(() => {
+  if (!initialTaskId) {
+    return
+  }
+  currentPhase.value = 'PENDING'
+  connectTaskProgress(initialTaskId)
 })
 </script>
 
@@ -291,6 +615,23 @@ onUnmounted(() => {
                       </UiFieldLabel>
                     </UiField>
                   </UiRadioGroup>
+                </UiCardContent>
+              </UiCard>
+
+              <UiCard>
+                <UiCardHeader>
+                  <UiCardTitle class="text-base">
+                    补充要求
+                  </UiCardTitle>
+                  <UiCardDescription>可选，确认标题后会带入大纲生成</UiCardDescription>
+                </UiCardHeader>
+                <UiCardContent>
+                  <UiTextarea
+                    v-model="userDescription"
+                    class="min-h-24 resize-none"
+                    placeholder="例如：面向职场新人，语气更犀利，重点写可执行建议"
+                    :disabled="isCreating"
+                  />
                 </UiCardContent>
               </UiCard>
 
@@ -420,6 +761,262 @@ onUnmounted(() => {
                 </UiCardContent>
               </UiCard>
             </UiCardContent>
+
+            <UiCardFooter class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm text-muted-foreground">
+                {{ selectedTitle ? `已选择：${selectedTitle.mainTitle}` : '请选择一个标题方案' }}
+              </p>
+              <UiButton :disabled="!selectedTitle || isConfirmingTitle" @click="handleConfirmTitle">
+                <LoaderCircleIcon v-if="isConfirmingTitle" class="mr-2 size-4 animate-spin" />
+                <PenLineIcon v-else class="mr-2 size-4" />
+                确认标题，生成大纲
+              </UiButton>
+            </UiCardFooter>
+          </UiCard>
+
+          <UiCard v-else-if="isOutlineGenerating" class="rounded-2xl border-0 bg-muted/40 shadow-sm">
+            <UiCardHeader class="items-center px-6 py-10 text-center sm:px-12">
+              <UiBadge variant="secondary" class="mb-2 gap-2 bg-emerald-50 text-emerald-600">
+                <LoaderCircleIcon class="size-4 animate-spin" />
+                第二步：规划大纲
+              </UiBadge>
+              <UiCardTitle class="text-3xl font-bold tracking-tight sm:text-4xl">
+                正在生成大纲
+              </UiCardTitle>
+              <UiCardDescription class="text-base">
+                AI 正在根据标题和补充要求规划文章结构
+              </UiCardDescription>
+            </UiCardHeader>
+
+            <UiCardContent class="space-y-6 px-6 pb-8 sm:px-12">
+              <UiCard>
+                <UiCardContent class="space-y-5 p-6">
+                  <div class="flex items-start gap-4">
+                    <UiSpinner class="mt-1 size-6 text-emerald-600" />
+                    <div class="min-w-0">
+                      <div class="font-semibold">
+                        {{ selectedTitle?.mainTitle }}
+                      </div>
+                      <p class="mt-2 text-sm leading-6 text-muted-foreground">
+                        大纲完成后会自动进入可编辑页面，你可以调整章节和要点后再生成正文。
+                      </p>
+                    </div>
+                  </div>
+                  <UiProgress :model-value="62" />
+                </UiCardContent>
+              </UiCard>
+            </UiCardContent>
+          </UiCard>
+
+          <UiCard v-else-if="isOutlineEditing" class="rounded-2xl border-0 bg-muted/40 shadow-sm">
+            <UiCardHeader class="flex flex-row items-center justify-between gap-3">
+              <div>
+                <UiCardTitle class="flex items-center gap-2">
+                  <FileTextIcon class="size-5" />
+                  编辑大纲
+                </UiCardTitle>
+                <UiCardDescription>
+                  直接编辑章节和要点，确认后进入正文生成
+                </UiCardDescription>
+              </div>
+              <div class="flex flex-wrap justify-end gap-2">
+                <UiBadge variant="outline">
+                  {{ outlineSectionCount }} 个章节
+                </UiBadge>
+                <UiBadge variant="outline">
+                  {{ outlinePointCount }} 个要点
+                </UiBadge>
+              </div>
+            </UiCardHeader>
+
+            <UiCardContent class="space-y-5">
+              <UiAlert class="border-emerald-200 bg-emerald-50/70">
+                <UiAlertTitle>严格提醒</UiAlertTitle>
+                <UiAlertDescription>
+                  不要把大纲改成散文。每个章节必须有标题和至少一个有效要点，这样正文生成才有清晰结构。
+                </UiAlertDescription>
+              </UiAlert>
+
+              <div class="space-y-4">
+                <UiCard
+                  v-for="(section, sectionIndex) in outlineSections"
+                  :key="`outline-section-${section.section}-${sectionIndex}`"
+                  class="overflow-hidden border-emerald-100 bg-white/90 shadow-sm"
+                >
+                  <UiCardHeader class="gap-4 border-b bg-gradient-to-r from-emerald-50 to-white">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div class="flex items-center gap-3">
+                        <UiBadge class="grid size-9 place-items-center rounded-full bg-emerald-600 p-0 text-white">
+                          {{ sectionIndex + 1 }}
+                        </UiBadge>
+                        <div>
+                          <UiCardTitle class="text-base">
+                            章节 {{ sectionIndex + 1 }}
+                          </UiCardTitle>
+                          <UiCardDescription>先定章节，再补要点</UiCardDescription>
+                        </div>
+                      </div>
+                      <UiButton
+                        variant="ghost"
+                        size="sm"
+                        class="text-muted-foreground hover:text-destructive"
+                        :disabled="outlineSections.length <= 1"
+                        @click="removeOutlineSection(sectionIndex)"
+                      >
+                        <Trash2Icon class="mr-2 size-4" />
+                        删除章节
+                      </UiButton>
+                    </div>
+
+                    <UiField>
+                      <UiFieldLabel :for="`outline-section-title-${sectionIndex}`">
+                        章节标题
+                      </UiFieldLabel>
+                      <UiInput
+                        :id="`outline-section-title-${sectionIndex}`"
+                        v-model="section.title"
+                        class="h-12 bg-background text-base font-semibold"
+                        placeholder="请输入章节标题"
+                      />
+                    </UiField>
+                  </UiCardHeader>
+
+                  <UiCardContent class="space-y-3 p-5">
+                    <div class="flex items-center justify-between gap-3">
+                      <div>
+                        <div class="font-medium">
+                          核心要点
+                        </div>
+                        <p class="text-sm text-muted-foreground">
+                          用短句说明这一节必须展开的内容
+                        </p>
+                      </div>
+                      <UiButton variant="outline" size="sm" @click="addOutlinePoint(sectionIndex)">
+                        <PlusIcon class="mr-2 size-4" />
+                        添加要点
+                      </UiButton>
+                    </div>
+
+                    <div class="space-y-3">
+                      <div
+                        v-for="(_, pointIndex) in section.points"
+                        :key="`outline-point-${sectionIndex}-${pointIndex}`"
+                        class="flex items-center gap-3 rounded-xl border bg-muted/20 p-3"
+                      >
+                        <UiBadge variant="secondary" class="shrink-0">
+                          {{ pointIndex + 1 }}
+                        </UiBadge>
+                        <UiInput
+                          v-model="section.points[pointIndex]"
+                          class="h-10 bg-background"
+                          placeholder="请输入要点，例如：解释问题背景并给出具体例子"
+                        />
+                        <UiButton
+                          variant="ghost"
+                          size="icon"
+                          class="shrink-0 text-muted-foreground hover:text-destructive"
+                          :disabled="section.points.length <= 1"
+                          @click="removeOutlinePoint(sectionIndex, pointIndex)"
+                        >
+                          <Trash2Icon class="size-4" />
+                        </UiButton>
+                      </div>
+                    </div>
+                  </UiCardContent>
+                </UiCard>
+              </div>
+            </UiCardContent>
+
+            <UiCardFooter class="flex flex-col items-stretch gap-3 sm:flex-row sm:justify-between">
+              <UiButton variant="outline" @click="addOutlineSection">
+                <PlusIcon class="mr-2 size-4" />
+                添加章节
+              </UiButton>
+              <UiButton :disabled="isConfirmingOutline" @click="handleConfirmOutline">
+                <LoaderCircleIcon v-if="isConfirmingOutline" class="mr-2 size-4 animate-spin" />
+                <RocketIcon v-else class="mr-2 size-4" />
+                确认大纲，生成正文
+              </UiButton>
+            </UiCardFooter>
+          </UiCard>
+
+          <UiCard v-else-if="isContentGenerating" class="rounded-2xl border-0 bg-muted/40 shadow-sm">
+            <UiCardHeader class="items-center px-6 py-10 text-center sm:px-12">
+              <UiBadge variant="secondary" class="mb-2 gap-2 bg-emerald-50 text-emerald-600">
+                <LoaderCircleIcon class="size-4 animate-spin" />
+                第三步：撰写正文
+              </UiBadge>
+              <UiCardTitle class="text-3xl font-bold tracking-tight sm:text-4xl">
+                正文生成中
+              </UiCardTitle>
+              <UiCardDescription class="text-base">
+                正在扩写每个章节，完成后会展示 Markdown 正文
+              </UiCardDescription>
+            </UiCardHeader>
+
+            <UiCardContent class="space-y-6 px-6 pb-8 sm:px-12">
+              <UiCard>
+                <UiCardContent class="space-y-5 p-6">
+                  <div class="flex items-start gap-4">
+                    <UiSpinner class="mt-1 size-6 text-emerald-600" />
+                    <div>
+                      <div class="font-semibold">
+                        正在写作：{{ selectedTitle?.mainTitle || '已确认标题' }}
+                      </div>
+                      <p class="mt-2 text-sm leading-6 text-muted-foreground">
+                        当前后端一次性返回正文结果，页面会在完成后自动切换到预览。
+                      </p>
+                    </div>
+                  </div>
+                  <UiProgress :model-value="82" />
+                </UiCardContent>
+              </UiCard>
+            </UiCardContent>
+          </UiCard>
+
+          <UiCard v-else-if="isCompleted" class="rounded-2xl border-0 bg-muted/40 shadow-sm">
+            <UiCardHeader class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <UiBadge variant="secondary" class="mb-3 gap-2 bg-emerald-50 text-emerald-600">
+                  <CheckCircle2Icon class="size-4" />
+                  已完成
+                </UiBadge>
+                <UiCardTitle class="text-2xl">
+                  正文生成结果
+                </UiCardTitle>
+                <UiCardDescription>
+                  Markdown 正文已保存，下面已转换为富文本阅读视图
+                </UiCardDescription>
+              </div>
+              <div class="flex flex-col items-start gap-2 sm:items-end">
+                <UiBadge variant="outline" class="max-w-full truncate">
+                  {{ taskId }}
+                </UiBadge>
+                <UiButton
+                  variant="outline"
+                  size="sm"
+                  :disabled="!generatedContent || !isClipboardSupported"
+                  @click="handleCopyGeneratedContent"
+                >
+                  <ClipboardCheckIcon v-if="isGeneratedContentCopied" class="mr-2 size-4 text-emerald-600" />
+                  <ClipboardIcon v-else class="mr-2 size-4" />
+                  {{ isGeneratedContentCopied ? '已复制' : '复制正文' }}
+                </UiButton>
+              </div>
+            </UiCardHeader>
+
+            <UiCardContent class="space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-900">
+                <span>富文本预览已按标题、段落、列表和代码块排版。</span>
+                <UiBadge variant="secondary">
+                  {{ generatedContentLength }} 字符
+                </UiBadge>
+              </div>
+
+              <div class="max-h-[720px] overflow-auto rounded-2xl border bg-white p-6 shadow-inner">
+                <MarkdownContentRenderer :content="generatedContent" />
+              </div>
+            </UiCardContent>
           </UiCard>
 
           <UiCard v-else class="rounded-2xl border-0 bg-muted/40 shadow-sm">
@@ -428,7 +1025,7 @@ onUnmounted(() => {
               <UiCardDescription>请返回输入阶段后重试。</UiCardDescription>
             </UiCardHeader>
             <UiCardContent>
-              <UiButton @click="currentPhase = 'INPUT'; taskId = ''; titleOptions = []">
+              <UiButton @click="resetCreatorState">
                 重新开始
               </UiButton>
             </UiCardContent>

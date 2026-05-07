@@ -19,6 +19,7 @@ import com.sakura.passage_creator.article.service.ArticleService;
 import com.sakura.passage_creator.shared.common.ErrorCode;
 import com.sakura.passage_creator.shared.constant.CommonConstant;
 import com.sakura.passage_creator.shared.constant.UserConstant;
+import com.sakura.passage_creator.shared.context.LoginUserContext;
 import com.sakura.passage_creator.shared.context.LoginUserInfo;
 import com.sakura.passage_creator.shared.exception.BusinessException;
 import com.sakura.passage_creator.shared.exception.ThrowUtils;
@@ -210,6 +211,81 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
         String titleOptionsJson = JSONUtil.toJsonStr(titleOptions);
         return updateChain()
                 .set(ARTICLE.TITLE_OPTIONS, titleOptionsJson)
+                .where(ARTICLE.TASK_ID.eq(taskId))
+                .update();
+    }
+
+    @Override
+    public boolean confirmTitle(Article article) {
+        Article entity = this.getOne(QueryWrapper.create()
+                .where(ARTICLE.TASK_ID.eq(article.getTaskId()))
+                .where(ARTICLE.USER_ID.eq(article.getUserId())));
+
+        // 校验是否处于 标题待选择状态
+        if (entity == null) return false;
+
+        String phase = entity.getPhase();
+        if (!ArticlePhaseEnum.TITLE_SELECTING.getValue().equals(phase)) return false;
+
+        // 保存
+        article.setPhase(ArticlePhaseEnum.OUTLINE_GENERATING.getValue());
+        article.setStatus(ArticleStatusEnum.PROCESSING.getValue());
+        article.setUserId(null);
+        article.setId(entity.getId());
+
+        return updateById(article);
+    }
+
+    @Override
+    public Boolean saveOutline(ArticleState.OutlineResult outline, String taskId) {
+        return updateChain()
+                .set(ARTICLE.OUTLINE, JSONUtil.toJsonStr(outline))
+                .where(ARTICLE.TASK_ID.eq(taskId))
+                .update();
+    }
+
+    @Override
+    public boolean confirmOutline(String taskId, ArticleState.OutlineResult outline) {
+        Long userId = LoginUserContext.getLoginUser().userId();
+        // 校验状态
+        Article entity = this.getOne(QueryWrapper.create()
+                .where(ARTICLE.TASK_ID.eq(taskId))
+                .where(ARTICLE.USER_ID.eq(userId)));
+
+        // 校验是否处于 标题待选择状态
+        if (entity == null) return false;
+
+        String phase = entity.getPhase();
+        if (!ArticlePhaseEnum.OUTLINE_EDITING.getValue().equals(phase)) return false;
+
+        // 更新
+        return saveOutline(outline, taskId);
+    }
+
+    @Override
+    public boolean completeContent(String taskId, String content) {
+        ThrowUtils.throwIf(StringUtils.isBlank(taskId), ErrorCode.PARAMS_ERROR, "任务 id 不能为空");
+        ThrowUtils.throwIf(StringUtils.isBlank(content), ErrorCode.PARAMS_ERROR, "正文内容不能为空");
+        // 正文生成完成时同步写入 fullContent，后续配图流程启用后可再覆盖 fullContent。
+        return updateChain()
+                .set(ARTICLE.CONTENT, content)
+                .set(ARTICLE.FULL_CONTENT, content)
+                .set(ARTICLE.STATUS, ArticleStatusEnum.COMPLETED.getValue())
+                .set(ARTICLE.PHASE, ArticlePhaseEnum.COMPLETED.getValue())
+                .set(ARTICLE.ERROR_MESSAGE, null)
+                .set(ARTICLE.COMPLETED_TIME, LocalDateTime.now())
+                .where(ARTICLE.TASK_ID.eq(taskId))
+                .update();
+    }
+
+    @Override
+    public boolean markFailed(String taskId, String errorMessage) {
+        ThrowUtils.throwIf(StringUtils.isBlank(taskId), ErrorCode.PARAMS_ERROR, "任务 id 不能为空");
+        // 失败原因写入数据库，方便前端刷新后仍能展示错误上下文。
+        return updateChain()
+                .set(ARTICLE.STATUS, ArticleStatusEnum.FAILED.getValue())
+                .set(ARTICLE.PHASE, ArticlePhaseEnum.FAILED.getValue())
+                .set(ARTICLE.ERROR_MESSAGE, StringUtils.defaultIfBlank(errorMessage, "文章生成失败"))
                 .where(ARTICLE.TASK_ID.eq(taskId))
                 .update();
     }

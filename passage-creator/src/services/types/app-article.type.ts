@@ -14,6 +14,40 @@ export interface ArticleTitleOption {
 }
 
 /**
+ * 文章大纲章节。
+ */
+export interface ArticleOutlineSection {
+  section: number
+  title: string
+  points: string[]
+}
+
+/**
+ * 文章大纲结果。
+ */
+export interface ArticleOutlineResult {
+  sections: ArticleOutlineSection[]
+}
+
+/**
+ * 确认标题并进入大纲生成阶段的请求。
+ */
+export interface AppArticleConfirmTitleRequest {
+  taskId: string
+  selectedMainTitle: string
+  selectedSubTitle: string
+  userDescription?: string
+}
+
+/**
+ * 确认大纲并进入正文生成阶段的请求。
+ */
+export interface AppArticleConfirmOutlineRequest {
+  taskId: string
+  outline: ArticleOutlineResult
+}
+
+/**
  * 文章生成阶段。
  */
 export type ArticlePhase

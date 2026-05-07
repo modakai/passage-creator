@@ -132,4 +132,48 @@ public interface ArticleService extends IService<Article> {
      * @return 是否成功
      */
     Boolean saveTitleOptions(List<ArticleState.TitleOption> titleOptions, String taskId);
+
+    /**
+     * 确认标题
+     *
+     * @param article 数据
+     * @return 是否成功
+     */
+    boolean confirmTitle(Article article);
+
+    /**
+     * 保存大纲
+     *
+     * @param outline 大纲
+     * @param taskId  任务
+     * @return 是否成功
+     */
+    Boolean saveOutline(ArticleState.OutlineResult outline, String taskId);
+
+    /**
+     * 更新大纲
+     *
+     * @param taskId  任务id
+     * @param outline 大纲
+     * @return 是否成功
+     */
+    boolean confirmOutline(String taskId, ArticleState.OutlineResult outline);
+
+    /**
+     * 保存正文并标记文章生成完成。
+     *
+     * @param taskId  任务 id
+     * @param content Markdown 正文
+     * @return 是否成功
+     */
+    boolean completeContent(String taskId, String content);
+
+    /**
+     * 标记文章生成失败。
+     *
+     * @param taskId       任务 id
+     * @param errorMessage 失败原因
+     * @return 是否成功
+     */
+    boolean markFailed(String taskId, String errorMessage);
 }

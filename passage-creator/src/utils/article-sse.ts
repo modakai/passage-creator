@@ -16,10 +16,21 @@ export interface ConnectArticleSseOptions {
  */
 function parseSseChunk(chunk: string) {
   return chunk
-    .split('\n')
+    .split(/\r?\n/)
     .filter(line => line.startsWith('data:'))
     .map(line => line.slice('data:'.length).trim())
     .filter(Boolean)
+}
+
+/**
+ * 兼容后端在任务恢复场景下返回的一次性 JSON 消息。
+ */
+function parseJsonMessage(value: unknown): ArticleSseMessage | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+  const message = value as ArticleSseMessage
+  return typeof message.type === 'string' ? message : null
 }
 
 /**
@@ -44,6 +55,16 @@ export function connectArticleSse(taskId: string, options: ConnectArticleSseOpti
         throw new Error(`SSE 连接失败：${response.status}`)
       }
 
+      const contentType = response.headers.get('content-type') ?? ''
+      if (contentType.includes('application/json')) {
+        const message = parseJsonMessage(await response.json())
+        if (message) {
+          options.onMessage(message)
+          return
+        }
+        throw new Error('任务进度响应格式不正确')
+      }
+
       const reader = response.body.getReader()
       const decoder = new TextDecoder('utf-8')
       let buffer = ''
@@ -55,7 +76,7 @@ export function connectArticleSse(taskId: string, options: ConnectArticleSseOpti
         }
 
         buffer += decoder.decode(value, { stream: true })
-        const chunks = buffer.split('\n\n')
+        const chunks = buffer.split(/\r?\n\r?\n/)
         buffer = chunks.pop() ?? ''
 
         for (const chunk of chunks) {

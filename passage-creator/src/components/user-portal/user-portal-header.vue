@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { LogOutIcon, MenuIcon, UserIcon } from '@lucide/vue'
+import { LogOutIcon, MenuIcon, UserIcon, WandSparklesIcon } from '@lucide/vue'
 
 import { NotificationBell } from '@/components/notification-center'
 import { useAuth } from '@/composables/use-auth'
