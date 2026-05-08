@@ -8,12 +8,16 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.constant.PromptConstant;
+import com.sakura.passage_creator.prompt.service.PromptTemplateRenderResult;
+import com.sakura.passage_creator.prompt.service.PromptTemplateService;
+import com.sakura.passage_creator.prompt.service.PromptUsageLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 标题生成Agent
@@ -32,7 +36,20 @@ public class TitleGeneratorAgent {
 
     private final ChatClient chatClient;
 
-    public TitleGeneratorAgent(DashScopeApi dashScopeApi) {
+    /**
+     * Prompt 模板服务，运行时读取 ACTIVE 版本并支持默认模板兜底。
+     */
+    private final PromptTemplateService promptTemplateService;
+
+    /**
+     * Prompt 使用日志服务，用于追溯 Agent 实际使用的模板版本。
+     */
+    private final PromptUsageLogService promptUsageLogService;
+
+    public TitleGeneratorAgent(DashScopeApi dashScopeApi, PromptTemplateService promptTemplateService,
+            PromptUsageLogService promptUsageLogService) {
+        this.promptTemplateService = promptTemplateService;
+        this.promptUsageLogService = promptUsageLogService;
         this.chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
@@ -43,37 +60,7 @@ public class TitleGeneratorAgent {
                         .build())
                 .build();
 
-        this.chatClient = ChatClient.builder(chatModel)
-                .defaultSystem("""
-                        你是一位爆款文章标题专家,擅长创作吸引人的标题。
-                        
-                        能根据用户提供的选题方向,生成 3-5 个爆款文章标题方案:
-                        
-                        要求:
-                        1. 每个方案包含主标题和副标题
-                        2. 主标题要包含数字、情绪化词汇,吸引眼球
-                        3. 副标题要补充说明,增强吸引力
-                        4. 标题要简洁有力,不超过30字
-                        5. 不同方案要有不同的切入角度
-                        6. 符合新媒体爆款文章的风格
-                        
-                        请直接返回 JSON 格式,不要有其他内容:
-                        [
-                          {
-                            "mainTitle": "主标题1",
-                            "subTitle": "副标题1"
-                          },
-                          {
-                            "mainTitle": "主标题2",
-                            "subTitle": "副标题2"
-                          },
-                          {
-                            "mainTitle": "主标题3",
-                            "subTitle": "副标题3"
-                          }
-                        ]
-                        """)
-                .build();
+        this.chatClient = ChatClient.builder(chatModel).build();
     }
 
     /**
@@ -85,25 +72,39 @@ public class TitleGeneratorAgent {
         log.info("阶段1：开始生成标题方案, taskId={}", state.getTaskId());
         String topic = state.getTopic();
 
-//        String promptText = PromptConstant.AGENT1_TITLE_PROMPT.replace("{topic}", topic);
-//        Prompt prompt = new Prompt(promptText);
+        PromptTemplateRenderResult systemPrompt = promptTemplateService.renderActive(
+                PromptConstant.AGENT1_TITLE_SYSTEM_KEY, PromptConstant.AGENT1_TITLE_SYSTEM_PROMPT, null, Map.of());
+        PromptTemplateRenderResult userPrompt = promptTemplateService.renderActive(
+                PromptConstant.AGENT1_TITLE_USER_KEY, PromptConstant.AGENT1_TITLE_PROMPT,
+                PromptConstant.AGENT1_TITLE_VARIABLE_SCHEMA, Map.of("topic", topic));
+        long startMillis = System.currentTimeMillis();
+        try {
+            String response = chatClient.prompt()
+                    .system(s -> s.text(systemPrompt.content()))
+                    .user(u -> u.text(userPrompt.content()))
+                    .call()
+                    .content();
+            List<ArticleState.TitleOption> optionList = JSONUtil.toBean(response,
+                    new TypeReference<List<ArticleState.TitleOption>>() {
+                    }, true);
 
-//        ChatResponse chatResponse = chatClient.call(prompt);
-
-//        // 转换 todo code可能返回错误，需要校验
-//        String response = chatResponse.getResult().getOutput().getText();
-
-        String response = chatClient.prompt()
-                .user(u -> u.text(PromptConstant.AGENT1_TITLE_PROMPT)
-                        .param("topic", topic))
-                .call()
-                .content();
-        List<ArticleState.TitleOption> optionList = JSONUtil.toBean(response,
-                new TypeReference<List<ArticleState.TitleOption>>() {
-                }, true);
-
-        state.setTitleOptions(optionList);
-        log.info("阶段1：生成标题方案完毕，taskId={}", state.getTaskId());
+            state.setTitleOptions(optionList);
+            recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), true, null, startMillis);
+            log.info("阶段1：生成标题方案完毕，taskId={}", state.getTaskId());
+        }
+        catch (RuntimeException e) {
+            recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), false, e.getMessage(), startMillis);
+            throw e;
+        }
     }
 
+    /**
+     * 记录标题 Agent 本次调用使用的系统 Prompt 和用户 Prompt。
+     */
+    private void recordPromptUsage(PromptTemplateRenderResult systemPrompt, PromptTemplateRenderResult userPrompt,
+            String taskId, boolean responseOk, String errorMessage, long startMillis) {
+        Integer latencyMs = Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
+        promptUsageLogService.recordUsage(systemPrompt, "TitleGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
+        promptUsageLogService.recordUsage(userPrompt, "TitleGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
+    }
 }

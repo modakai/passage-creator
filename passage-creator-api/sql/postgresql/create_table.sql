@@ -179,6 +179,53 @@ create table if not exists public.sys_notification_template
 );
 create index if not exists idx_template_event_enabled on public.sys_notification_template (event_type, enabled);
 
+-- Prompt 模板版本表。
+create table if not exists public.prompt_template
+(
+    id               bigserial primary key,
+    template_key     varchar(100)                         not null,
+    version          varchar(20)                          not null,
+    content          text                                 not null,
+    variables_schema jsonb,
+    description      text,
+    status           varchar(20) default 'DRAFT'          not null,
+    environment      varchar(20) default 'production'     not null,
+    created_by       varchar(100),
+    published_by     varchar(100),
+    published_at     timestamp,
+    created_at       timestamp   default current_timestamp not null,
+    updated_at       timestamp   default current_timestamp not null,
+    constraint uk_prompt_key_version_env unique (template_key, version, environment)
+);
+create unique index if not exists uk_prompt_key_env_active
+    on public.prompt_template (template_key, environment)
+    where status = 'ACTIVE';
+create index if not exists idx_prompt_key_env_status on public.prompt_template (template_key, environment, status);
+create index if not exists idx_prompt_updated_at on public.prompt_template (updated_at);
+
+-- Prompt 使用日志表。
+create table if not exists public.prompt_usage_log
+(
+    id                 bigserial primary key,
+    prompt_template_id bigint,
+    template_key       varchar(100)                         not null,
+    version            varchar(20)                          not null,
+    environment        varchar(20)                          not null,
+    agent_name         varchar(100)                         not null,
+    task_id            varchar(100),
+    session_id         varchar(100),
+    user_id            bigint,
+    used_at            timestamp default current_timestamp  not null,
+    response_ok        boolean,
+    error_message      text,
+    latency_ms         integer,
+    feedback           integer
+);
+create index if not exists idx_prompt_usage_template_time on public.prompt_usage_log (template_key, used_at);
+create index if not exists idx_prompt_usage_agent_time on public.prompt_usage_log (agent_name, used_at);
+create index if not exists idx_prompt_usage_task_id on public.prompt_usage_log (task_id);
+create index if not exists idx_prompt_usage_template_id on public.prompt_usage_log (prompt_template_id);
+
 -- 审计日志表。
 create table if not exists public.sys_audit_log
 (

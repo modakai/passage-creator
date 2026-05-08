@@ -7,6 +7,9 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.constant.PromptConstant;
+import com.sakura.passage_creator.prompt.service.PromptTemplateRenderResult;
+import com.sakura.passage_creator.prompt.service.PromptTemplateService;
+import com.sakura.passage_creator.prompt.service.PromptUsageLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -29,7 +32,20 @@ public class ContentGeneratorAgent {
      */
     private final ChatClient chatClient;
 
-    public ContentGeneratorAgent(DashScopeApi dashScopeApi) {
+    /**
+     * Prompt 模板服务，运行时读取 ACTIVE 版本并支持默认模板兜底。
+     */
+    private final PromptTemplateService promptTemplateService;
+
+    /**
+     * Prompt 使用日志服务，用于追溯 Agent 实际使用的模板版本。
+     */
+    private final PromptUsageLogService promptUsageLogService;
+
+    public ContentGeneratorAgent(DashScopeApi dashScopeApi, PromptTemplateService promptTemplateService,
+            PromptUsageLogService promptUsageLogService) {
+        this.promptTemplateService = promptTemplateService;
+        this.promptUsageLogService = promptUsageLogService;
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
@@ -40,23 +56,7 @@ public class ContentGeneratorAgent {
                         .build())
                 .build();
 
-        this.chatClient = ChatClient.builder(chatModel)
-                .defaultSystem("""
-                        你是一位资深的内容创作者,擅长撰写优质文章。
-                        
-                        根据用户提供的大纲、标题,创作文章正文，具体有：
-                        主标题、副标题、大纲
-                        
-                        要求:
-                        1. 内容要充实,每个章节300-400字
-                        2. 语言流畅,富有感染力
-                        3. 适当使用金句,增强可读性
-                        4. 添加过渡句,确保逻辑连贯
-                        5. 使用 Markdown 格式,章节使用 ## 标题
-                        
-                        请直接返回 Markdown 格式的正文内容,不要有其他内容。
-                        """)
-                .build();
+        this.chatClient = ChatClient.builder(chatModel).build();
     }
 
     /**
@@ -70,18 +70,41 @@ public class ContentGeneratorAgent {
         ArticleState.OutlineResult outline = state.getOutline();
 
         // 大纲作为 JSON 放入提示词，避免章节和要点在字符串拼接时丢失结构。
-        String response = chatClient.prompt()
-                .user(u -> u.text(PromptConstant.AGENT3_CONTENT_PROMPT)
-                        .params(Map.of(
-                                "mainTitle", title.getMainTitle(),
-                                "subTitle", title.getSubTitle(),
-                                "outline", JSONUtil.toJsonPrettyStr(outline)
-                        ))
-                )
-                .call()
-                .content();
+        PromptTemplateRenderResult systemPrompt = promptTemplateService.renderActive(
+                PromptConstant.AGENT3_CONTENT_SYSTEM_KEY, PromptConstant.AGENT3_CONTENT_SYSTEM_PROMPT, null, Map.of());
+        PromptTemplateRenderResult userPrompt = promptTemplateService.renderActive(
+                PromptConstant.AGENT3_CONTENT_USER_KEY, PromptConstant.AGENT3_CONTENT_PROMPT,
+                PromptConstant.AGENT3_CONTENT_VARIABLE_SCHEMA,
+                Map.of(
+                        "mainTitle", title.getMainTitle(),
+                        "subTitle", title.getSubTitle(),
+                        "outline", JSONUtil.toJsonPrettyStr(outline)
+                ));
+        long startMillis = System.currentTimeMillis();
+        try {
+            String response = chatClient.prompt()
+                    .system(s -> s.text(systemPrompt.content()))
+                    .user(u -> u.text(userPrompt.content()))
+                    .call()
+                    .content();
 
-        state.setContent(response);
-        log.info("阶段3：生成正文完毕, taskId={}", state.getTaskId());
+            state.setContent(response);
+            recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), true, null, startMillis);
+            log.info("阶段3：生成正文完毕, taskId={}", state.getTaskId());
+        }
+        catch (RuntimeException e) {
+            recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), false, e.getMessage(), startMillis);
+            throw e;
+        }
+    }
+
+    /**
+     * 记录正文 Agent 本次调用使用的系统 Prompt 和用户 Prompt。
+     */
+    private void recordPromptUsage(PromptTemplateRenderResult systemPrompt, PromptTemplateRenderResult userPrompt,
+            String taskId, boolean responseOk, String errorMessage, long startMillis) {
+        Integer latencyMs = Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
+        promptUsageLogService.recordUsage(systemPrompt, "ContentGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
+        promptUsageLogService.recordUsage(userPrompt, "ContentGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
     }
 }

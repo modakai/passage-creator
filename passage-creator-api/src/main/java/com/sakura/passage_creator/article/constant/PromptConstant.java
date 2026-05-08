@@ -7,12 +7,109 @@ package com.sakura.passage_creator.article.constant;
  */
 public interface PromptConstant {
 
+    /**
+     * 标题生成 Agent 系统 Prompt 模板标识。
+     */
+    String AGENT1_TITLE_SYSTEM_KEY = "article.title.system";
+
+    /**
+     * 标题生成 Agent 用户 Prompt 模板标识。
+     */
+    String AGENT1_TITLE_USER_KEY = "article.title.user";
+
+    /**
+     * 大纲生成 Agent 系统 Prompt 模板标识。
+     */
+    String AGENT2_OUTLINE_SYSTEM_KEY = "article.outline.system";
+
+    /**
+     * 大纲生成 Agent 用户 Prompt 模板标识。
+     */
+    String AGENT2_OUTLINE_USER_KEY = "article.outline.user";
+
+    /**
+     * 正文生成 Agent 系统 Prompt 模板标识。
+     */
+    String AGENT3_CONTENT_SYSTEM_KEY = "article.content.system";
+
+    /**
+     * 正文生成 Agent 用户 Prompt 模板标识。
+     */
+    String AGENT3_CONTENT_USER_KEY = "article.content.user";
+
+    /**
+     * 智能体1：生成标题方案系统 Prompt。
+     */
+    String AGENT1_TITLE_SYSTEM_PROMPT = """
+            你是一位爆款文章标题专家,擅长创作吸引人的标题。
+            
+            能根据用户提供的选题方向,生成 3-5 个爆款文章标题方案:
+            
+            要求:
+            1. 每个方案包含主标题和副标题
+            2. 主标题要包含数字、情绪化词汇,吸引眼球
+            3. 副标题要补充说明,增强吸引力
+            4. 标题要简洁有力,不超过30字
+            5. 不同方案要有不同的切入角度
+            6. 符合新媒体爆款文章的风格
+            
+            请直接返回 JSON 格式,不要有其他内容:
+            [
+              {
+                "mainTitle": "主标题1",
+                "subTitle": "副标题1"
+              },
+              {
+                "mainTitle": "主标题2",
+                "subTitle": "副标题2"
+              },
+              {
+                "mainTitle": "主标题3",
+                "subTitle": "副标题3"
+              }
+            ]
+            """;
+
 
     /**
      * 智能体1：生成标题方案
      */
     String AGENT1_TITLE_PROMPT = """
             选题：{topic}
+            """;
+
+    /**
+     * 智能体1：生成标题方案变量定义。
+     */
+    String AGENT1_TITLE_VARIABLE_SCHEMA = """
+            [{"name":"topic","label":"选题","required":true}]
+            """;
+
+    /**
+     * 智能体2：生成大纲系统 Prompt。
+     */
+    String AGENT2_OUTLINE_SYSTEM_PROMPT = """
+            你是一位专业的文章策划师,擅长设计文章结构。
+            
+            根据提供的主标题、副标题和补充描述[可选，用户提供就用，没提供就不管]，生成文章的大纲
+            
+            要求:
+            1. 大纲要有清晰的逻辑结构
+            2. 包含开头引入、核心观点(3-5个)、结尾升华
+            3. 每个章节要有明确的标题和核心要点(2-3个)
+            4. 适合2000字左右，但不要超过3000字的文章
+            5. 所有 JSON 字符串值必须使用英文双引号包裹，不能省略引号
+            
+            请直接返回 JSON 格式,不要有其他内容:
+            {
+              "sections": [
+                {
+                  "section": 1,
+                  "title": "章节标题",
+                  "points": ["要点1", "要点2"]
+                }
+              ]
+            }
             """;
 
     /**
@@ -23,6 +120,37 @@ public interface PromptConstant {
             主标题：{mainTitle}
             副标题：{subTitle}
             {descriptionSection}
+            """;
+
+    /**
+     * 智能体2：生成大纲变量定义。
+     */
+    String AGENT2_OUTLINE_VARIABLE_SCHEMA = """
+            [
+              {"name":"mainTitle","label":"主标题","required":true},
+              {"name":"subTitle","label":"副标题","required":true},
+              {"name":"descriptionSection","label":"补充描述","required":true},
+              {"name":"format","label":"结构化输出格式","required":true}
+            ]
+            """;
+
+    /**
+     * 智能体3：生成正文系统 Prompt。
+     */
+    String AGENT3_CONTENT_SYSTEM_PROMPT = """
+            你是一位资深的内容创作者,擅长撰写优质文章。
+            
+            根据用户提供的大纲、标题,创作文章正文，具体有：
+            主标题、副标题、大纲
+            
+            要求:
+            1. 内容要充实,每个章节300-400字
+            2. 语言流畅,富有感染力
+            3. 适当使用金句,增强可读性
+            4. 添加过渡句,确保逻辑连贯
+            5. 使用 Markdown 格式,章节使用 ## 标题
+            
+            请直接返回 Markdown 格式的正文内容,不要有其他内容。
             """;
 
     /**
@@ -77,6 +205,17 @@ public interface PromptConstant {
             副标题：{subTitle}
             大纲：
             {outline}
+            """;
+
+    /**
+     * 智能体3：生成正文变量定义。
+     */
+    String AGENT3_CONTENT_VARIABLE_SCHEMA = """
+            [
+              {"name":"mainTitle","label":"主标题","required":true},
+              {"name":"subTitle","label":"副标题","required":true},
+              {"name":"outline","label":"大纲","required":true}
+            ]
             """;
 
     /**

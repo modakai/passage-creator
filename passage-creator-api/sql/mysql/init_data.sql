@@ -167,3 +167,170 @@ insert into sys_notification_template (
     enabled = values(enabled),
     remark = values(remark),
     is_delete = values(is_delete);
+
+-- 默认 Prompt 模板版本，首次启动后即可在后台查看并发布新版本覆盖。
+insert into prompt_template (
+    template_key,
+    version,
+    content,
+    variables_schema,
+    description,
+    status,
+    environment,
+    created_by,
+    published_by,
+    published_at
+) values
+(
+    'article.title.system',
+    '1.0.0',
+    '你是一位爆款文章标题专家,擅长创作吸引人的标题。
+
+能根据用户提供的选题方向,生成 3-5 个爆款文章标题方案:
+
+要求:
+1. 每个方案包含主标题和副标题
+2. 主标题要包含数字、情绪化词汇,吸引眼球
+3. 副标题要补充说明,增强吸引力
+4. 标题要简洁有力,不超过30字
+5. 不同方案要有不同的切入角度
+6. 符合新媒体爆款文章的风格
+
+请直接返回 JSON 格式,不要有其他内容:
+[
+  {
+    "mainTitle": "主标题1",
+    "subTitle": "副标题1"
+  },
+  {
+    "mainTitle": "主标题2",
+    "subTitle": "副标题2"
+  },
+  {
+    "mainTitle": "主标题3",
+    "subTitle": "副标题3"
+  }
+]',
+    null,
+    '默认标题生成系统 Prompt',
+    'ACTIVE',
+    'production',
+    'system',
+    'system',
+    current_timestamp
+),
+(
+    'article.title.user',
+    '1.0.0',
+    '选题：{topic}
+',
+    '[{"name":"topic","label":"选题","required":true}]',
+    '默认标题生成用户 Prompt',
+    'ACTIVE',
+    'production',
+    'system',
+    'system',
+    current_timestamp
+),
+(
+    'article.outline.system',
+    '1.0.0',
+    '你是一位专业的文章策划师,擅长设计文章结构。
+
+根据提供的主标题、副标题和补充描述[可选，用户提供就用，没提供就不管]，生成文章的大纲
+
+要求:
+1. 大纲要有清晰的逻辑结构
+2. 包含开头引入、核心观点(3-5个)、结尾升华
+3. 每个章节要有明确的标题和核心要点(2-3个)
+4. 适合2000字左右，但不要超过3000字的文章
+5. 所有 JSON 字符串值必须使用英文双引号包裹，不能省略引号
+
+请直接返回 JSON 格式,不要有其他内容:
+{
+  "sections": [
+    {
+      "section": 1,
+      "title": "章节标题",
+      "points": ["要点1", "要点2"]
+    }
+  ]
+}',
+    null,
+    '默认大纲生成系统 Prompt',
+    'ACTIVE',
+    'production',
+    'system',
+    'system',
+    current_timestamp
+),
+(
+    'article.outline.user',
+    '1.0.0',
+    '根据以下标题,生成文章大纲:
+主标题：{mainTitle}
+副标题：{subTitle}
+{descriptionSection}
+{format}',
+    '[
+      {"name":"mainTitle","label":"主标题","required":true},
+      {"name":"subTitle","label":"副标题","required":true},
+      {"name":"descriptionSection","label":"补充描述","required":true},
+      {"name":"format","label":"结构化输出格式","required":true}
+    ]',
+    '默认大纲生成用户 Prompt',
+    'ACTIVE',
+    'production',
+    'system',
+    'system',
+    current_timestamp
+),
+(
+    'article.content.system',
+    '1.0.0',
+    '你是一位资深的内容创作者,擅长撰写优质文章。
+
+根据用户提供的大纲、标题,创作文章正文，具体有：
+主标题、副标题、大纲
+
+要求:
+1. 内容要充实,每个章节300-400字
+2. 语言流畅,富有感染力
+3. 适当使用金句,增强可读性
+4. 添加过渡句,确保逻辑连贯
+5. 使用 Markdown 格式,章节使用 ## 标题
+
+请直接返回 Markdown 格式的正文内容,不要有其他内容。',
+    null,
+    '默认正文生成系统 Prompt',
+    'ACTIVE',
+    'production',
+    'system',
+    'system',
+    current_timestamp
+),
+(
+    'article.content.user',
+    '1.0.0',
+    '根据以下大纲,创作文章正文:
+主标题：{mainTitle}
+副标题：{subTitle}
+大纲：
+{outline}
+',
+    '[
+      {"name":"mainTitle","label":"主标题","required":true},
+      {"name":"subTitle","label":"副标题","required":true},
+      {"name":"outline","label":"大纲","required":true}
+    ]',
+    '默认正文生成用户 Prompt',
+    'ACTIVE',
+    'production',
+    'system',
+    'system',
+    current_timestamp
+)
+on duplicate key update
+    content = values(content),
+    variables_schema = values(variables_schema),
+    description = values(description);

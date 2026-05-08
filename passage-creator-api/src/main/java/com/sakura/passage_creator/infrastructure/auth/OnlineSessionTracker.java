@@ -30,6 +30,13 @@ public interface OnlineSessionTracker {
     void refreshLastAccess(String token);
 
     /**
+     * 根据已解析的用户 id 刷新在线会话最近访问时间，避免请求链路重复查询 token。
+     *
+     * @param userId 用户 id
+     */
+    void refreshLastAccess(Long userId);
+
+    /**
      * 按 token 删除在线会话。
      *
      * @param token 登录 token

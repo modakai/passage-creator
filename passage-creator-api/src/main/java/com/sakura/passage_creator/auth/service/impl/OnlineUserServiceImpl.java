@@ -112,7 +112,12 @@ public class OnlineUserServiceImpl implements OnlineUserService {
         if (StringUtils.isBlank(token)) {
             return;
         }
-        Long userId = tokenManager.getUserId(token);
+        refreshLastAccess(tokenManager.getUserId(token));
+    }
+
+    @Override
+    public void refreshLastAccess(Long userId) {
+        // 登录拦截器已经拿到 userId 时走这个入口，减少每次请求的一次 Redis token 读取。
         OnlineUserSession session = sessionRepository.findByUserId(userId);
         if (session == null) {
             rebuildSessionMetadata(userId);

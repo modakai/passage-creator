@@ -296,6 +296,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/prompt-templates/': RouteRecordInfo<
+      '/prompt-templates/',
+      '/prompt-templates',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/prop-components/': RouteRecordInfo<
       '/prop-components/',
       '/prop-components',
@@ -589,6 +596,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/profile/index.vue': {
       routes:
         | '/profile/'
+      views:
+        | never
+    }
+    'src/pages/prompt-templates/index.vue': {
+      routes:
+        | '/prompt-templates/'
       views:
         | never
     }

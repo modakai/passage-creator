@@ -183,6 +183,52 @@ create table if not exists sys_notification_template
     key idx_event_enabled (event_type, enabled)
 ) comment '消息通知模板' collate = utf8mb4_unicode_ci;
 
+-- Prompt 模板版本表
+create table if not exists prompt_template
+(
+    id               bigint auto_increment comment 'id' primary key,
+    template_key     varchar(100)                          not null comment '模板标识，例如 article.title.user',
+    version          varchar(20)                           not null comment '版本号，例如 1.0.0',
+    content          mediumtext                            not null comment 'Prompt 模板内容',
+    variables_schema json                                  null comment '变量定义 JSON',
+    description      text                                  null comment '本版本变更说明',
+    status           varchar(20) default 'DRAFT'           not null comment '状态：DRAFT/ACTIVE/ARCHIVED',
+    environment      varchar(20) default 'production'      not null comment '运行环境：production/staging/dev',
+    created_by       varchar(100)                          null comment '创建人',
+    published_by     varchar(100)                          null comment '发布人',
+    published_at     datetime                              null comment '发布时间',
+    created_at       datetime    default CURRENT_TIMESTAMP not null comment '创建时间',
+    updated_at       datetime    default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    active_slot      tinyint generated always as (case when status = 'ACTIVE' then 1 else null end) stored comment 'ACTIVE 唯一约束槽',
+    unique key uk_prompt_key_version_env (template_key, version, environment),
+    unique key uk_prompt_key_env_active (template_key, environment, active_slot),
+    key idx_prompt_key_env_status (template_key, environment, status),
+    key idx_prompt_updated_at (updated_at)
+) comment 'Prompt 模板版本表' collate = utf8mb4_unicode_ci;
+
+-- Prompt 使用日志表
+create table if not exists prompt_usage_log
+(
+    id                 bigint auto_increment comment 'id' primary key,
+    prompt_template_id bigint                                null comment '使用的 Prompt 模板版本 ID',
+    template_key       varchar(100)                          not null comment '模板标识',
+    version            varchar(20)                           not null comment '版本号',
+    environment        varchar(20)                           not null comment '运行环境',
+    agent_name         varchar(100)                          not null comment 'Agent 名称',
+    task_id            varchar(100)                          null comment '任务 ID',
+    session_id         varchar(100)                          null comment '会话 ID',
+    user_id            bigint                                null comment '用户 ID',
+    used_at            datetime    default CURRENT_TIMESTAMP not null comment '使用时间',
+    response_ok        tinyint(1)                            null comment '本次调用是否成功',
+    error_message      text                                  null comment '失败原因',
+    latency_ms         int                                   null comment '调用耗时毫秒',
+    feedback           int                                   null comment '用户反馈评分',
+    key idx_prompt_usage_template_time (template_key, used_at),
+    key idx_prompt_usage_agent_time (agent_name, used_at),
+    key idx_prompt_usage_task_id (task_id),
+    key idx_prompt_usage_template_id (prompt_template_id)
+) comment 'Prompt 使用日志表' collate = utf8mb4_unicode_ci;
+
 -- 审计日志表
 create table if not exists sys_audit_log
 (

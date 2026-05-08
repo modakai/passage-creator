@@ -72,7 +72,8 @@ public class LoginInterceptor implements HandlerInterceptor {
             throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
         }
         LoginUserContext.setLoginUser(loginUserInfo);
-        onlineSessionTracker.refreshLastAccess(token);
+        // userId 已在本拦截器中解析完成，直接传递可避免在线会话刷新重复读取 token 映射。
+        onlineSessionTracker.refreshLastAccess(userId);
         return true;
     }
 
