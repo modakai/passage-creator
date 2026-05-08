@@ -1,10 +1,12 @@
 package com.sakura.passage_creator.article.controller.app;
 
 import cn.hutool.json.JSONUtil;
+import com.mybatisflex.core.paginate.Page;
 import com.sakura.passage_creator.article.manager.SseEmitterManager;
 import com.sakura.passage_creator.article.model.dto.ArticleConfirmOutlineRequest;
 import com.sakura.passage_creator.article.model.dto.ArticleConfirmTitleRequest;
 import com.sakura.passage_creator.article.model.dto.ArticleCreateRequest;
+import com.sakura.passage_creator.article.model.dto.ArticleQueryRequest;
 import com.sakura.passage_creator.article.model.dto.SseMessage;
 import com.sakura.passage_creator.article.model.entity.Article;
 import com.sakura.passage_creator.article.model.enums.SseMessageTypeEnum;
@@ -19,6 +21,7 @@ import com.sakura.passage_creator.shared.context.LoginUserInfo;
 import com.sakura.passage_creator.shared.exception.ThrowUtils;
 import io.github.linpeilie.Converter;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.MediaType;
@@ -27,8 +30,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.List;
 
 /**
  * 用户端 文章接口
@@ -64,6 +70,33 @@ public class AppArticleController {
         articleAsyncService.executePhase1(taskId, request.getTopic());
 
         return ResultUtils.success(taskId);
+    }
+
+    /**
+     * 用户端分页查看本人文章创建记录。
+     */
+    @PostMapping("/list/page")
+    public BaseResponse<Page<ArticleVO>> listMyArticleByPage(@Valid @RequestBody ArticleQueryRequest queryRequest) {
+        LoginUserInfo loginUser = LoginUserContext.getLoginUser();
+        long current = queryRequest.getPage();
+        long pageSize = queryRequest.getPageSize();
+        // 用户端记录页始终查询本人数据，管理员在前台也只能看到自己的创作记录。
+        queryRequest.setUserId(loginUser.userId());
+        Page<Article> page = articleService.page(new Page<>(current, pageSize),
+                articleService.getQueryWrapper(queryRequest, loginUser));
+        List<ArticleVO> articleVOList = articleService.getArticleVO(page.getRecords());
+        Page<ArticleVO> voPage = new Page<>(current, pageSize, page.getTotalRow());
+        voPage.setRecords(articleVOList);
+        return ResultUtils.success(voPage);
+    }
+
+    /**
+     * 用户端根据 id 查看本人文章创建记录详情。
+     */
+    @GetMapping("/get")
+    public BaseResponse<ArticleVO> getMyArticleById(@RequestParam @Positive(message = "文章 id 必须大于 0") long id) {
+        Article article = articleService.getOwnedArticle(id, LoginUserContext.getLoginUser());
+        return ResultUtils.success(articleService.getArticleVO(article));
     }
 
 
@@ -127,7 +160,7 @@ public class AppArticleController {
      */
     private SseEmitter createProgressEmitter(String taskId) {
         ThrowUtils.throwIf(StringUtils.isBlank(taskId), ErrorCode.PARAMS_ERROR, "任务 id 不能为空");
-        Article article = articleService.getAccessibleArticleByTaskId(taskId, LoginUserContext.getLoginUser());
+        Article article = articleService.getOwnedArticleByTaskId(taskId, LoginUserContext.getLoginUser());
         // SSE 连接由管理器按 taskId 保存，后续异步阶段通过 taskId 推送消息。
         SseEmitter emitter = sseEmitterManager.createEmitter(taskId);
         ArticleVO articleVO = articleService.getArticleVO(article);

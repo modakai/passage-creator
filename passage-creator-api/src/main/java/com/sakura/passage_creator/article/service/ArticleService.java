@@ -65,6 +65,24 @@ public interface ArticleService extends IService<Article> {
     Article getAccessibleArticleByTaskId(String taskId, LoginUserInfo loginUser);
 
     /**
+     * 根据文章 id 获取当前登录用户本人创建的文章。
+     *
+     * @param id        文章 id
+     * @param loginUser 当前登录用户
+     * @return 文章实体
+     */
+    Article getOwnedArticle(Long id, LoginUserInfo loginUser);
+
+    /**
+     * 根据任务 id 获取当前登录用户本人创建的文章。
+     *
+     * @param taskId    对外任务 id
+     * @param loginUser 当前登录用户
+     * @return 文章实体
+     */
+    Article getOwnedArticleByTaskId(String taskId, LoginUserInfo loginUser);
+
+    /**
      * 构造查询条件。
      *
      * @param queryRequest 查询请求

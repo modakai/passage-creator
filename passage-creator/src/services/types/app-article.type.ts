@@ -1,3 +1,5 @@
+import type { IPageResponse, IPaginationRequestQuery } from '@/services/types/response.type'
+
 /**
  * 用户端创建文章任务请求。
  */
@@ -65,6 +67,7 @@ export type ArticlePhase
  * 文章任务进度快照。
  */
 export interface AppArticleProgress {
+  id?: number
   taskId: string
   topic: string
   status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
@@ -76,6 +79,32 @@ export interface AppArticleProgress {
   content?: string
   fullContent?: string
   errorMessage?: string
+  createTime?: string
+  completedTime?: string
+  updateTime?: string
+}
+
+/**
+ * 用户端文章记录项，复用创作进度快照字段并补充数据库主键。
+ */
+export type AppArticleItem = AppArticleProgress & {
+  id: number
+}
+
+/**
+ * 用户端文章分页响应。
+ */
+export type AppArticlePageResponse<T> = IPageResponse<T>
+
+/**
+ * 用户端文章记录查询条件。
+ */
+export interface AppArticleQuery extends IPaginationRequestQuery {
+  page: number
+  pageSize: number
+  topic?: string
+  title?: string
+  status?: '' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
 }
 
 /**

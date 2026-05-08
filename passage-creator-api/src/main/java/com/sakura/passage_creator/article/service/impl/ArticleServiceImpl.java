@@ -114,6 +114,32 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     }
 
     @Override
+    public Article getOwnedArticle(Long id, LoginUserInfo loginUser) {
+        assertLogin(loginUser);
+        if (id == null || id <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 用户端只允许读取本人创建的任务，管理员进入前台时也不扩大可见范围。
+        Article article = this.getOne(QueryWrapper.create()
+                .where(ARTICLE.ID.eq(id))
+                .and(ARTICLE.USER_ID.eq(loginUser.userId())));
+        ThrowUtils.throwIf(article == null, ErrorCode.NOT_FOUND_ERROR);
+        return article;
+    }
+
+    @Override
+    public Article getOwnedArticleByTaskId(String taskId, LoginUserInfo loginUser) {
+        assertLogin(loginUser);
+        ThrowUtils.throwIf(StringUtils.isBlank(taskId), ErrorCode.PARAMS_ERROR, "任务 id 不能为空");
+        // 用户端恢复流程必须绑定本人 taskId，避免管理员角色绕过前台边界读取他人任务。
+        Article article = this.getOne(QueryWrapper.create()
+                .where(ARTICLE.TASK_ID.eq(taskId))
+                .and(ARTICLE.USER_ID.eq(loginUser.userId())));
+        ThrowUtils.throwIf(article == null, ErrorCode.NOT_FOUND_ERROR);
+        return article;
+    }
+
+    @Override
     public QueryWrapper getQueryWrapper(ArticleQueryRequest queryRequest, LoginUserInfo loginUser) {
         assertLogin(loginUser);
         if (queryRequest == null) {

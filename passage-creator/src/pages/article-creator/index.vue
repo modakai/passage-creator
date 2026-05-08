@@ -25,12 +25,12 @@ import type {
   ArticleTitleOption,
 } from '@/services/types/app-article.type'
 
+import MarkdownContentRenderer from '@/components/article/markdown-content-renderer.vue'
 import {
   confirmAppArticleOutline,
   confirmAppArticleTitle,
   createAppArticleTask,
 } from '@/services/api/app-article.api'
-import MarkdownContentRenderer from '@/components/article/markdown-content-renderer.vue'
 import { connectArticleSse } from '@/utils/article-sse'
 
 type ArticleStyle = '默认' | '科技风格' | '情感风格' | '教育风格' | '轻松幽默'
