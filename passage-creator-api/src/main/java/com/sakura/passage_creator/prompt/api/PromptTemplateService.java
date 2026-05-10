@@ -1,4 +1,4 @@
-package com.sakura.passage_creator.prompt.service;
+package com.sakura.passage_creator.prompt.api;
 
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;

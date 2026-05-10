@@ -3,7 +3,7 @@
  */
 @ApplicationModule(
         displayName = "文章模块",
-        allowedDependencies = {"shared", "infrastructure", "audit::api"}
+        allowedDependencies = {"shared", "infrastructure", "audit::api", "prompt::api"}
 )
 package com.sakura.passage_creator.article;
 

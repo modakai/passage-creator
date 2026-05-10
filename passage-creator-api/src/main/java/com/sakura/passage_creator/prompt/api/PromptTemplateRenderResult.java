@@ -1,4 +1,4 @@
-package com.sakura.passage_creator.prompt.service;
+package com.sakura.passage_creator.prompt.api;
 
 /**
  * Prompt 运行时渲染结果。
