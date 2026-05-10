@@ -4,9 +4,12 @@ import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.row.Db;
 import com.sakura.passage_creator.article.agent.ContentGeneratorAgent;
+import com.sakura.passage_creator.article.agent.ImageAnalyzerAgent;
 import com.sakura.passage_creator.article.agent.OutlineGeneratorAgent;
 import com.sakura.passage_creator.article.agent.TitleGeneratorAgent;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
+import com.sakura.passage_creator.article.image.service.ArticleImageGenerationService;
+import com.sakura.passage_creator.article.image.service.ContentImageMerger;
 import com.sakura.passage_creator.article.manager.SseEmitterManager;
 import com.sakura.passage_creator.article.model.dto.SseMessage;
 import com.sakura.passage_creator.article.model.entity.Article;
@@ -39,6 +42,9 @@ public class ArticleAsyncService {
     private final TitleGeneratorAgent titleGeneratorAgent;
     private final OutlineGeneratorAgent outlineGeneratorAgent;
     private final ContentGeneratorAgent contentGeneratorAgent;
+    private final ImageAnalyzerAgent imageAnalyzerAgent;
+    private final ArticleImageGenerationService articleImageGenerationService;
+    private final ContentImageMerger contentImageMerger;
 
     private final SseEmitterManager sseEmitterManager;
 
@@ -51,6 +57,7 @@ public class ArticleAsyncService {
             // 更新状态和阶段
             Db.tx(() -> articleService.updateStatus(ArticleStatusEnum.PROCESSING, taskId) &&
                     articleService.updatePhase(ArticlePhaseEnum.TITLE_GENERATING, taskId));
+            sendPhaseChanged(taskId, ArticlePhaseEnum.TITLE_GENERATING);
 
             // 创建状态对象
             ArticleState articleState = new ArticleState();
@@ -88,6 +95,8 @@ public class ArticleAsyncService {
     @Async("articleExecutor")
     public void executePhase2(String taskId, String mainTitle, String subTitle, String userDescription) {
         try {
+            sendPhaseChanged(taskId, ArticlePhaseEnum.OUTLINE_GENERATING);
+
             // 构建 智能体上下文
             ArticleState.TitleResult titleResult = new ArticleState.TitleResult();
             titleResult.setMainTitle(mainTitle);
@@ -131,6 +140,7 @@ public class ArticleAsyncService {
             // 正文生成运行在线程池中，不能依赖请求线程里的 LoginUserContext。
             Db.tx(() -> articleService.updateStatus(ArticleStatusEnum.PROCESSING, taskId) &&
                     articleService.updatePhase(ArticlePhaseEnum.CONTENT_GENERATING, taskId));
+            sendPhaseChanged(taskId, ArticlePhaseEnum.CONTENT_GENERATING);
 
             Article article = articleService.getOne(QueryWrapper.create()
                     .where(ARTICLE.TASK_ID.eq(taskId)));
@@ -150,17 +160,73 @@ public class ArticleAsyncService {
 
             contentGeneratorAgent.generatorContent(articleState);
 
-            String content = articleState.getContent();
-            if (!articleService.completeContent(taskId, content)) {
-                throw new IllegalStateException("正文保存失败");
-            }
+            // 正文完成后进入配图分析，第一阶段不引入 workflow，但保留清晰阶段边界。
+            Db.tx(() -> articleService.updatePhase(ArticlePhaseEnum.IMAGE_ANALYZING, taskId));
+            sendPhaseChanged(taskId, ArticlePhaseEnum.IMAGE_ANALYZING);
+            imageAnalyzerAgent.analyze(articleState);
+            SseMessage<List<ArticleState.ImageRequirement>> imageAnalyzedMessage =
+                    SseMessage.of(SseMessageTypeEnum.IMAGE_ANALYZED, articleState.getImageRequirements());
+            sseEmitterManager.send(taskId, JSONUtil.toJsonStr(imageAnalyzedMessage));
 
-            SseMessage<String> message = SseMessage.of(SseMessageTypeEnum.ALL_COMPLETE, content);
+            // 配图生成保持串行执行，便于先把 gpt-image-2 单链路跑通。
+            Db.tx(() -> articleService.updatePhase(ArticlePhaseEnum.IMAGE_GENERATING, taskId));
+            sendPhaseChanged(taskId, ArticlePhaseEnum.IMAGE_GENERATING);
+            List<ArticleState.ImageResult> images = articleImageGenerationService.generateImages(
+                    taskId,
+                    articleState.getImageRequirements(),
+                    image -> {
+                        SseMessage<ArticleState.ImageResult> imageMessage =
+                                SseMessage.of(SseMessageTypeEnum.IMAGE_COMPLETE, image);
+                        sseEmitterManager.send(taskId, JSONUtil.toJsonStr(imageMessage));
+                    }
+            );
+            articleState.setImages(images);
+            articleState.setCoverImage(resolveCoverImage(images));
+            SseMessage<List<ArticleState.ImageResult>> imageGeneratedMessage =
+                    SseMessage.of(SseMessageTypeEnum.IMAGE_GENERATED, images);
+            sseEmitterManager.send(taskId, JSONUtil.toJsonStr(imageGeneratedMessage));
+
+            // 图文合成只替换正文里的章节图占位符，封面图单独保存在 coverImage。
+            Db.tx(() -> articleService.updatePhase(ArticlePhaseEnum.CONTENT_MERGING, taskId));
+            sendPhaseChanged(taskId, ArticlePhaseEnum.CONTENT_MERGING);
+            String fullContent = contentImageMerger.merge(articleState.getContent(), images);
+            articleState.setFullContent(fullContent);
+            SseMessage<String> mergeMessage = SseMessage.of(SseMessageTypeEnum.MERGE_COMPLETE, fullContent);
+            sseEmitterManager.send(taskId, JSONUtil.toJsonStr(mergeMessage));
+
+            if (!articleService.completeContentWithImages(taskId, articleState)) {
+                throw new IllegalStateException("完整图文保存失败");
+            }
+            sendPhaseChanged(taskId, ArticlePhaseEnum.COMPLETED);
+
+            SseMessage<String> message = SseMessage.of(SseMessageTypeEnum.ALL_COMPLETE, fullContent);
             sseEmitterManager.send(taskId, JSONUtil.toJsonStr(message));
         } catch (Exception exception) {
-            handleFailure(taskId, "阶段3：生成正文失败", exception);
+            handleFailure(taskId, "阶段3：生成正文和配图失败", exception);
         }
 
+    }
+
+    /**
+     * 获取封面图 URL。约定 position=1 为封面图。
+     */
+    private String resolveCoverImage(List<ArticleState.ImageResult> images) {
+        if (images == null || images.isEmpty()) {
+            return null;
+        }
+        return images.stream()
+                .filter(image -> image.getPosition() != null && image.getPosition() == 1)
+                .map(ArticleState.ImageResult::getUrl)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 推送阶段变化消息，前端据此展示完整创作流程。
+     */
+    private void sendPhaseChanged(String taskId, ArticlePhaseEnum phase) {
+        SseMessage<String> message = SseMessage.of(SseMessageTypeEnum.PHASE_CHANGED, phase.getValue());
+        sseEmitterManager.send(taskId, JSONUtil.toJsonStr(message));
     }
 
     /**

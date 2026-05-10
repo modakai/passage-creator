@@ -6,6 +6,9 @@ import pinia from '@/plugins/pinia/setup'
 import { useAuthStore } from '@/stores/auth'
 import { buildApiRequestHeaders } from '@/utils/request-locale'
 
+const SSE_LINE_BREAK_RE = /\r?\n/
+const SSE_CHUNK_BREAK_RE = /\r?\n\r?\n/
+
 export interface ConnectArticleSseOptions {
   onMessage: (message: ArticleSseMessage) => void
   onError?: (error: unknown) => void
@@ -16,7 +19,7 @@ export interface ConnectArticleSseOptions {
  */
 function parseSseChunk(chunk: string) {
   return chunk
-    .split(/\r?\n/)
+    .split(SSE_LINE_BREAK_RE)
     .filter(line => line.startsWith('data:'))
     .map(line => line.slice('data:'.length).trim())
     .filter(Boolean)
@@ -76,7 +79,7 @@ export function connectArticleSse(taskId: string, options: ConnectArticleSseOpti
         }
 
         buffer += decoder.decode(value, { stream: true })
-        const chunks = buffer.split(/\r?\n\r?\n/)
+        const chunks = buffer.split(SSE_CHUNK_BREAK_RE)
         buffer = chunks.pop() ?? ''
 
         for (const chunk of chunks) {

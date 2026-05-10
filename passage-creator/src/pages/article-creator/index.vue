@@ -56,9 +56,9 @@ const steps = computed(() => [
   { title: '生成标题', desc: 'AI 分析选题，生成吸睛标题', active: ['INPUT', 'PENDING', 'TITLE_GENERATING', 'TITLE_SELECTING'].includes(currentPhase.value) },
   { title: '规划大纲', desc: '构建文章结构，理清脉络', active: ['OUTLINE_GENERATING', 'OUTLINE_EDITING'].includes(currentPhase.value) },
   { title: '撰写正文', desc: '流式生成高质量文章内容', active: currentPhase.value === 'CONTENT_GENERATING' },
-  { title: '分析配图', desc: '当前版本暂不启用配图', active: false },
-  { title: '生成配图', desc: '当前版本暂不启用配图', active: false },
-  { title: '图文合成', desc: '正文完成后展示结果', active: currentPhase.value === 'COMPLETED' },
+  { title: '分析配图', desc: '分析封面和章节配图需求', active: currentPhase.value === 'IMAGE_ANALYZING' },
+  { title: '生成配图', desc: '使用 GPT Image 2 生成配图', active: currentPhase.value === 'IMAGE_GENERATING' },
+  { title: '图文合成', desc: '将图片插入正文并保存结果', active: ['CONTENT_MERGING', 'COMPLETED'].includes(currentPhase.value) },
 ])
 
 const hotTopics = [
@@ -77,7 +77,7 @@ const writingTips = [
 ]
 
 const styleOptions: ArticleStyle[] = ['默认', '科技风格', '情感风格', '教育风格', '轻松幽默']
-const imageOptions = ['Pexels', 'Nano Banana', 'Mermaid', 'Iconify', '表情包', 'SVG']
+const imageOptions = ['GPT Image 2']
 
 const topicLength = computed(() => topic.value.length)
 const canCreate = computed(() => topic.value.trim().length > 0 && !isCreating.value)
@@ -90,7 +90,21 @@ const isTitleSelecting = computed(() =>
 )
 const isOutlineGenerating = computed(() => currentPhase.value === 'OUTLINE_GENERATING')
 const isOutlineEditing = computed(() => currentPhase.value === 'OUTLINE_EDITING')
-const isContentGenerating = computed(() => currentPhase.value === 'CONTENT_GENERATING')
+const isContentGenerating = computed(() =>
+  ['CONTENT_GENERATING', 'IMAGE_ANALYZING', 'IMAGE_GENERATING', 'CONTENT_MERGING'].includes(currentPhase.value),
+)
+const generationTitle = computed(() => {
+  if (currentPhase.value === 'IMAGE_ANALYZING') {
+    return '配图分析中'
+  }
+  if (currentPhase.value === 'IMAGE_GENERATING') {
+    return '配图生成中'
+  }
+  if (currentPhase.value === 'CONTENT_MERGING') {
+    return '图文合成中'
+  }
+  return '正文生成中'
+})
 const isCompleted = computed(() => currentPhase.value === 'COMPLETED')
 const selectedTitle = computed(() => {
   if (selectedTitleIndex.value === null) {
@@ -115,7 +129,13 @@ const stepperValue = computed(() => {
   if (currentPhase.value === 'CONTENT_GENERATING') {
     return 3
   }
-  if (currentPhase.value === 'COMPLETED') {
+  if (currentPhase.value === 'IMAGE_ANALYZING') {
+    return 4
+  }
+  if (currentPhase.value === 'IMAGE_GENERATING') {
+    return 5
+  }
+  if (['CONTENT_MERGING', 'COMPLETED'].includes(currentPhase.value)) {
     return 6
   }
   return 1
@@ -273,7 +293,7 @@ function applyProgress(progress: AppArticleProgress) {
   currentPhase.value = progress.phase ?? 'PENDING'
   taskId.value = progress.taskId
   topic.value = progress.topic
-  generatedContent.value = progress.content ?? progress.fullContent ?? generatedContent.value
+  generatedContent.value = progress.fullContent ?? progress.content ?? generatedContent.value
   const options = parseTitleOptions(progress.titleOptions)
   if (options.length > 0) {
     titleOptions.value = options
@@ -328,6 +348,10 @@ function handleArticleSseMessage(message: ArticleSseMessage) {
     applyProgress(message.data as AppArticleProgress)
   }
 
+  if (message.type === 'PHASE_CHANGED') {
+    currentPhase.value = message.data as ArticlePhase
+  }
+
   if (message.type === 'TITLES_GENERATED') {
     titleOptions.value = (message.data ?? []) as ArticleTitleOption[]
     currentPhase.value = 'TITLE_SELECTING'
@@ -348,6 +372,18 @@ function handleArticleSseMessage(message: ArticleSseMessage) {
     isConfirmingOutline.value = false
     isConnected.value = false
     toast.success('正文已生成')
+  }
+
+  if (message.type === 'IMAGE_ANALYZED') {
+    currentPhase.value = 'IMAGE_GENERATING'
+  }
+
+  if (message.type === 'IMAGE_GENERATED') {
+    currentPhase.value = 'CONTENT_MERGING'
+  }
+
+  if (message.type === 'MERGE_COMPLETE') {
+    generatedContent.value = String(message.data ?? generatedContent.value)
   }
 
   if (message.type === 'ERROR') {
@@ -635,12 +671,12 @@ onMounted(() => {
                 </UiCardContent>
               </UiCard>
 
-              <UiCard class="opacity-70">
+              <UiCard>
                 <UiCardHeader>
                   <UiCardTitle class="text-base">
                     配图方式
                   </UiCardTitle>
-                  <UiCardDescription>当前版本暂不启用配图</UiCardDescription>
+                  <UiCardDescription>当前固定使用 GPT Image 2，后续再开放多策略选择</UiCardDescription>
                 </UiCardHeader>
                 <UiCardContent>
                   <div class="flex flex-wrap gap-3">
@@ -650,8 +686,8 @@ onMounted(() => {
                       orientation="horizontal"
                       class="w-auto items-center rounded-md border px-4 py-2.5"
                     >
-                      <UiCheckbox :id="`image-${item}`" disabled />
-                      <UiFieldLabel :for="`image-${item}`" class="font-medium text-muted-foreground">
+                      <UiCheckbox :id="`image-${item}`" :model-value="true" disabled />
+                      <UiFieldLabel :for="`image-${item}`" class="font-medium">
                         {{ item }}
                       </UiFieldLabel>
                     </UiField>
@@ -947,7 +983,7 @@ onMounted(() => {
                 第三步：撰写正文
               </UiBadge>
               <UiCardTitle class="text-3xl font-bold tracking-tight sm:text-4xl">
-                正文生成中
+                {{ generationTitle }}
               </UiCardTitle>
               <UiCardDescription class="text-base">
                 正在扩写每个章节，完成后会展示 Markdown 正文

@@ -69,6 +69,31 @@ public class ArticleState implements Serializable {
      */
     private String content;
 
+    /**
+     * 配图需求列表，由配图分析 Agent 根据正文和配图数量上限生成。
+     */
+    private List<ImageRequirement> imageRequirements;
+
+    /**
+     * 配图结果列表，保存生成后的公开访问地址和占位符映射。
+     */
+    private List<ImageResult> images;
+
+    /**
+     * 完整图文内容，使用 Markdown 格式并包含已替换的配图链接。
+     */
+    private String fullContent;
+
+    /**
+     * 封面图 URL，封面不插入正文，但用于列表或详情头图展示。
+     */
+    private String coverImage;
+
+    /**
+     * 允许使用的配图方式。第一阶段只启用 GPT_IMAGE，后续再扩展策略。
+     */
+    private List<String> enabledImageMethods;
+
 
     /**
      * 标题方案
@@ -106,5 +131,41 @@ public class ArticleState implements Serializable {
         private List<String> points;
     }
 
+    /**
+     * 配图需求，描述一张图片应该如何生成以及放在正文哪里。
+     */
+    @Data
+    public static class ImageRequirement implements Serializable {
+        private Integer position;
+        private String type;
+        private String sectionTitle;
+        private String imageSource;
+        private String keywords;
+        private String prompt;
+        private String placeholderId;
+    }
+
+    /**
+     * 配图结果，保存图片 URL 和正文占位符之间的对应关系。
+     */
+    @Data
+    public static class ImageResult implements Serializable {
+        private Integer position;
+        private String url;
+        private String method;
+        private String keywords;
+        private String sectionTitle;
+        private String description;
+        private String placeholderId;
+    }
+
+    /**
+     * 配图分析 Agent 的结构化返回值，包含带占位符正文和配图需求。
+     */
+    @Data
+    public static class Agent4Result implements Serializable {
+        private String contentWithPlaceholders;
+        private List<ImageRequirement> imageRequirements;
+    }
 
 }

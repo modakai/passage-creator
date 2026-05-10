@@ -187,6 +187,15 @@ public interface ArticleService extends IService<Article> {
     boolean completeContent(String taskId, String content);
 
     /**
+     * 保存正文、配图和完整图文并标记文章生成完成。
+     *
+     * @param taskId 任务 id
+     * @param state  包含正文、配图和完整图文的文章状态
+     * @return 是否成功
+     */
+    boolean completeContentWithImages(String taskId, ArticleState state);
+
+    /**
      * 标记文章生成失败。
      *
      * @param taskId       任务 id

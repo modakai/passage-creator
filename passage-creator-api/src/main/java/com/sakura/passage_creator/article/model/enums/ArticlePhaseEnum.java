@@ -17,6 +17,9 @@ public enum ArticlePhaseEnum {
     //OUTLINE_GENERATING   大纲生成中
     //OUTLINE_EDITING      等待用户编辑大纲
     //CONTENT_GENERATING   正文生成中
+    //IMAGE_ANALYZING      配图需求分析中
+    //IMAGE_GENERATING     配图生成中
+    //CONTENT_MERGING      图文合成中
     //COMPLETED            已完成
     //FAILED               失败
     PENDING("PENDING", "等待处理"),
@@ -25,6 +28,9 @@ public enum ArticlePhaseEnum {
     OUTLINE_GENERATING("OUTLINE_GENERATING", "生成大纲中"),
     OUTLINE_EDITING("OUTLINE_EDITING", "等待编辑大纲"),
     CONTENT_GENERATING("CONTENT_GENERATING", "生成正文中"),
+    IMAGE_ANALYZING("IMAGE_ANALYZING", "分析配图中"),
+    IMAGE_GENERATING("IMAGE_GENERATING", "生成配图中"),
+    CONTENT_MERGING("CONTENT_MERGING", "图文合成中"),
     COMPLETED("COMPLETED", "已完成"),
     FAILED("FAILED", "失败");
 
@@ -49,7 +55,10 @@ public enum ArticlePhaseEnum {
             case TITLE_SELECTING -> OUTLINE_GENERATING;
             case OUTLINE_GENERATING -> OUTLINE_EDITING;
             case OUTLINE_EDITING -> CONTENT_GENERATING;
-            case CONTENT_GENERATING -> COMPLETED;
+            case CONTENT_GENERATING -> IMAGE_ANALYZING;
+            case IMAGE_ANALYZING -> IMAGE_GENERATING;
+            case IMAGE_GENERATING -> CONTENT_MERGING;
+            case CONTENT_MERGING -> COMPLETED;
             default -> FAILED;
         };
         return phaseEnum.getValue();

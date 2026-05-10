@@ -60,6 +60,9 @@ export type ArticlePhase
     | 'OUTLINE_GENERATING'
     | 'OUTLINE_EDITING'
     | 'CONTENT_GENERATING'
+    | 'IMAGE_ANALYZING'
+    | 'IMAGE_GENERATING'
+    | 'CONTENT_MERGING'
     | 'COMPLETED'
     | 'FAILED'
 
@@ -112,10 +115,15 @@ export interface AppArticleQuery extends IPaginationRequestQuery {
  */
 export type ArticleSseMessageType
   = | 'PROGRESS'
+    | 'PHASE_CHANGED'
     | 'TITLES_GENERATED'
     | 'OUTLINE_STREAMING'
     | 'OUTLINE_GENERATED'
     | 'CONTENT_STREAMING'
+    | 'IMAGE_ANALYZED'
+    | 'IMAGE_COMPLETE'
+    | 'IMAGE_GENERATED'
+    | 'MERGE_COMPLETE'
     | 'ALL_COMPLETE'
     | 'ERROR'
 

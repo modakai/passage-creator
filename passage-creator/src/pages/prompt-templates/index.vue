@@ -16,8 +16,8 @@ import {
   useDeletePromptTemplateMutation,
   useGetPromptTemplatePageQuery,
   useGetPromptUsageLogPageQuery,
-  usePromptTemplateVersionsRequest,
   usePromptTemplateActionMutation,
+  usePromptTemplateVersionsRequest,
   useRefreshPromptTemplateMutation,
   useUpdatePromptTemplateMutation,
 } from '@/services/api/prompt-template.api'

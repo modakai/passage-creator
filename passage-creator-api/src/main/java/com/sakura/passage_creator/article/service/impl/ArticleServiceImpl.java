@@ -305,6 +305,27 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     }
 
     @Override
+    public boolean completeContentWithImages(String taskId, ArticleState state) {
+        ThrowUtils.throwIf(StringUtils.isBlank(taskId), ErrorCode.PARAMS_ERROR, "任务 id 不能为空");
+        ThrowUtils.throwIf(state == null || StringUtils.isBlank(state.getContent()),
+                ErrorCode.PARAMS_ERROR, "正文内容不能为空");
+        String fullContent = StringUtils.defaultIfBlank(state.getFullContent(), state.getContent());
+
+        // 配图信息和完整图文一起落库，保证刷新页面后能恢复最终生成结果。
+        return updateChain()
+                .set(ARTICLE.CONTENT, state.getContent())
+                .set(ARTICLE.FULL_CONTENT, fullContent)
+                .set(ARTICLE.COVER_IMAGE, state.getCoverImage())
+                .set(ARTICLE.IMAGES, JSONUtil.toJsonStr(state.getImages()))
+                .set(ARTICLE.STATUS, ArticleStatusEnum.COMPLETED.getValue())
+                .set(ARTICLE.PHASE, ArticlePhaseEnum.COMPLETED.getValue())
+                .set(ARTICLE.ERROR_MESSAGE, null)
+                .set(ARTICLE.COMPLETED_TIME, LocalDateTime.now())
+                .where(ARTICLE.TASK_ID.eq(taskId))
+                .update();
+    }
+
+    @Override
     public boolean markFailed(String taskId, String errorMessage) {
         ThrowUtils.throwIf(StringUtils.isBlank(taskId), ErrorCode.PARAMS_ERROR, "任务 id 不能为空");
         // 失败原因写入数据库，方便前端刷新后仍能展示错误上下文。
