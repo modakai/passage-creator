@@ -3,11 +3,13 @@ package com.sakura.passage_creator.billing.service.impl;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.row.Db;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
+import com.sakura.passage_creator.billing.model.dto.CreditAccountQueryRequest;
 import com.sakura.passage_creator.billing.model.dto.CreditRechargeRequest;
 import com.sakura.passage_creator.billing.model.entity.CreditAccount;
 import com.sakura.passage_creator.billing.model.entity.CreditTransaction;
 import com.sakura.passage_creator.billing.model.enums.CreditTransactionStatusEnum;
 import com.sakura.passage_creator.billing.model.enums.CreditTransactionTypeEnum;
+import com.sakura.passage_creator.billing.model.vo.CreditAccountVO;
 import com.sakura.passage_creator.billing.model.vo.CreditSummaryVO;
 import com.sakura.passage_creator.billing.repository.CreditAccountMapper;
 import com.sakura.passage_creator.billing.service.AiTokenCostCalculator;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static com.sakura.passage_creator.billing.model.entity.table.CreditAccountTableDef.CREDIT_ACCOUNT;
 
@@ -72,6 +75,24 @@ public class CreditAccountServiceImpl extends ServiceImpl<CreditAccountMapper, C
         vo.setTotalRecharge(normalize(account.getTotalRecharge()));
         vo.setTotalConsume(normalize(account.getTotalConsume()));
         return vo;
+    }
+
+    @Override
+    public QueryWrapper getAccountQueryWrapper(CreditAccountQueryRequest request) {
+        CreditAccountQueryRequest safeRequest = request == null ? new CreditAccountQueryRequest() : request;
+        QueryWrapper wrapper = QueryWrapper.create();
+        wrapper.where(CREDIT_ACCOUNT.USER_ID.eq(safeRequest.getUserId(), safeRequest.getUserId() != null));
+        if (Boolean.TRUE.equals(safeRequest.getPositiveBalanceOnly())) {
+            wrapper.and(CREDIT_ACCOUNT.BALANCE.gt(BigDecimal.ZERO));
+        }
+        wrapper.orderBy(CREDIT_ACCOUNT.UPDATE_TIME, false);
+        wrapper.orderBy(CREDIT_ACCOUNT.ID, false);
+        return wrapper;
+    }
+
+    @Override
+    public List<CreditAccountVO> getAccountVO(List<CreditAccount> records) {
+        return records.stream().map(this::toVO).toList();
     }
 
     @Override
@@ -202,5 +223,17 @@ public class CreditAccountServiceImpl extends ServiceImpl<CreditAccountMapper, C
 
     private BigDecimal normalize(BigDecimal value) {
         return amountNormalizer.normalize(value);
+    }
+
+    private CreditAccountVO toVO(CreditAccount account) {
+        CreditAccountVO vo = new CreditAccountVO();
+        vo.setId(account.getId());
+        vo.setUserId(account.getUserId());
+        vo.setBalance(normalize(account.getBalance()));
+        vo.setTotalRecharge(normalize(account.getTotalRecharge()));
+        vo.setTotalConsume(normalize(account.getTotalConsume()));
+        vo.setCreateTime(account.getCreateTime());
+        vo.setUpdateTime(account.getUpdateTime());
+        return vo;
     }
 }

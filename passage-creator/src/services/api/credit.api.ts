@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 
-import type { CreditRechargeForm, CreditSummary, CreditTransactionItem, CreditTransactionQuery } from '@/services/types/credit.type'
+import type { CreditAccountItem, CreditAccountQuery, CreditRechargeForm, CreditSummary, CreditTransactionItem, CreditTransactionQuery } from '@/services/types/credit.type'
 import type { IPageResponse, IResponse } from '@/services/types/response.type'
 
 import { useApiFetch } from '@/composables/use-fetch'
@@ -67,6 +67,21 @@ export function useGetAdminCreditTransactionsQuery(query: CreditTransactionQuery
 }
 
 /**
+ * 管理端获取用户积分余额。
+ */
+export function useGetAdminCreditAccountsQuery(query: CreditAccountQuery) {
+  const { apiFetch } = useApiFetch()
+
+  return useQuery<IResponse<IPageResponse<CreditAccountItem>>, Error>({
+    queryKey: computed(() => ['admin-credit-accounts', { ...query }]),
+    queryFn: async () => await apiFetch<IResponse<IPageResponse<CreditAccountItem>>>('/credit/admin/accounts/page', {
+      method: 'post',
+      body: normalizeCreditQuery(query),
+    }),
+  })
+}
+
+/**
  * 管理员手动充值积分。
  */
 export function useRechargeCreditMutation() {
@@ -80,6 +95,7 @@ export function useRechargeCreditMutation() {
       body: normalizeCreditRechargePayload(data),
     }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-credit-accounts'] })
       queryClient.invalidateQueries({ queryKey: ['admin-credit-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['credit-summary'] })
     },

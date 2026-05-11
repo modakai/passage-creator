@@ -5,6 +5,7 @@ import type { CreditTransactionQuery } from '@/services/types/credit.type'
 
 import { BasicPage } from '@/components/global-layout'
 import { useGetCreditSummaryQuery, useGetMyCreditTransactionsQuery } from '@/services/api/credit.api'
+import { getCreditTransactionStatusLabel, getCreditTransactionTypeLabel } from '@/services/types/credit.type'
 
 /**
  * 当前用户积分流水查询条件。
@@ -128,10 +129,10 @@ function refreshAll() {
             <tbody>
               <tr v-for="item in transactions" :key="item.id" class="border-b last:border-b-0">
                 <td class="px-4 py-3">
-                  {{ item.transactionType }}
+                  {{ getCreditTransactionTypeLabel(item.transactionType) }}
                 </td>
                 <td class="px-4 py-3">
-                  {{ item.status }}
+                  {{ getCreditTransactionStatusLabel(item.status) }}
                 </td>
                 <td class="px-4 py-3 font-medium">
                   {{ formatCredits(item.amount) }}
@@ -169,3 +170,10 @@ function refreshAll() {
     </UiCard>
   </BasicPage>
 </template>
+
+<route lang="yaml">
+meta:
+  layout: user
+  auth: true
+  section: user
+</route>

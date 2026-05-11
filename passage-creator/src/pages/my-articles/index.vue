@@ -146,7 +146,7 @@ function continueCreation(article: AppArticleItem) {
       <div>
         <UiBadge variant="secondary" class="mb-3 gap-2 bg-emerald-50 text-emerald-700">
           <FileTextIcon class="size-4" />
-          用户端文章管理
+          用户端创作记录
         </UiBadge>
         <h1 class="text-3xl font-bold tracking-tight text-slate-950">
           我的创作记录

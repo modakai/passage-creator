@@ -1,6 +1,7 @@
 import {
   BarChart3Icon,
   ChartColumnBigIcon,
+  CreditCardIcon,
   HomeIcon,
   ImageIcon,
   Layers3Icon,
@@ -16,7 +17,8 @@ import {
 export const userNavItems = [
   { label: '首页', to: '/', icon: HomeIcon },
   { label: '创作', to: '/article-creator', icon: PenLineIcon },
-  { label: '文章管理', to: '/my-articles', icon: ListIcon },
+  { label: '创作记录', to: '/my-articles', icon: ListIcon },
+  { label: '积分中心', to: '/billing', icon: CreditCardIcon },
   { label: '管理', to: '/dashboard', icon: SettingsIcon, adminOnly: true },
   { label: '数据', to: '/observability/system-status', icon: BarChart3Icon, adminOnly: true },
 ]

@@ -1,9 +1,12 @@
 package com.sakura.passage_creator.billing.controller.admin;
 
 import com.mybatisflex.core.paginate.Page;
+import com.sakura.passage_creator.billing.model.dto.CreditAccountQueryRequest;
 import com.sakura.passage_creator.billing.model.dto.CreditRechargeRequest;
 import com.sakura.passage_creator.billing.model.dto.CreditTransactionQueryRequest;
+import com.sakura.passage_creator.billing.model.entity.CreditAccount;
 import com.sakura.passage_creator.billing.model.entity.CreditTransaction;
+import com.sakura.passage_creator.billing.model.vo.CreditAccountVO;
 import com.sakura.passage_creator.billing.model.vo.CreditTransactionVO;
 import com.sakura.passage_creator.billing.service.CreditAccountService;
 import com.sakura.passage_creator.billing.service.CreditTransactionService;
@@ -46,6 +49,21 @@ public class CreditAdminController {
     public BaseResponse<Boolean> recharge(@Valid @RequestBody CreditRechargeRequest request) {
         creditAccountService.recharge(request, resolveOperator());
         return ResultUtils.success(true);
+    }
+
+    /**
+     * 管理端分页查看用户积分余额。
+     */
+    @PostMapping("/accounts/page")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Page<CreditAccountVO>> listAccountsByPage(
+            @Valid @RequestBody CreditAccountQueryRequest request) {
+        Page<CreditAccount> page = creditAccountService.page(Page.of(request.getPage(), request.getPageSize()),
+                creditAccountService.getAccountQueryWrapper(request));
+        List<CreditAccountVO> voList = creditAccountService.getAccountVO(page.getRecords());
+        Page<CreditAccountVO> voPage = new Page<>(page.getPageNumber(), page.getPageSize(), page.getTotalRow());
+        voPage.setRecords(voList);
+        return ResultUtils.success(voPage);
     }
 
     /**
