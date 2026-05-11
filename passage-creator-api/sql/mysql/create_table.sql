@@ -230,6 +230,89 @@ create table if not exists prompt_usage_log
     key idx_prompt_usage_template_id (prompt_template_id)
 ) comment 'Prompt 使用日志表' collate = utf8mb4_unicode_ci;
 
+-- AI 模型费率配置表
+create table if not exists ai_model_pricing
+(
+    id                            bigint auto_increment comment 'id' primary key,
+    provider                      varchar(64)                            not null comment '模型供应商',
+    model                         varchar(128)                           not null comment '模型名称',
+    request_type                  varchar(32)                            not null comment '请求类型：TEXT/IMAGE',
+    prompt_token_price_per1k      decimal(18, 6) default 0.000000        not null comment '输入 Token 每千积分单价',
+    completion_token_price_per1k  decimal(18, 6) default 0.000000        not null comment '输出 Token 每千积分单价',
+    fixed_credits                 decimal(18, 4) default 0.0000          not null comment '固定调用积分成本',
+    reserve_credits               decimal(18, 4) default 1.0000          not null comment '调用前预扣积分',
+    enabled                       tinyint       default 1                not null comment '是否启用',
+    create_time                   datetime      default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time                   datetime      default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    is_delete                     tinyint       default 0                not null comment '是否删除',
+    unique key uk_ai_pricing_provider_model_type (provider, model, request_type),
+    key idx_ai_pricing_enabled (enabled)
+) comment 'AI 模型费率配置表' collate = utf8mb4_unicode_ci;
+
+-- AI 用量记录表
+create table if not exists ai_usage_record
+(
+    id                bigint auto_increment comment 'id' primary key,
+    user_id           bigint                                not null comment '用户 ID',
+    task_id           varchar(100)                          null comment '任务 ID',
+    agent_name        varchar(100)                          not null comment 'Agent 或策略名称',
+    phase             varchar(64)                           null comment '创作阶段',
+    provider          varchar(64)                           not null comment '模型供应商',
+    model             varchar(128)                          not null comment '模型名称',
+    request_type      varchar(32)                           not null comment '请求类型：TEXT/IMAGE',
+    prompt_tokens     bigint      default 0                 not null comment '输入 Token 数',
+    completion_tokens bigint      default 0                 not null comment '输出 Token 数',
+    total_tokens      bigint      default 0                 not null comment '总 Token 数',
+    credit_cost       decimal(18, 4) default 0.0000         not null comment '积分成本',
+    latency_ms        int                                   null comment '调用耗时毫秒',
+    response_ok       tinyint(1)                            null comment '调用是否成功',
+    error_message     text                                  null comment '失败原因',
+    used_at           datetime    default CURRENT_TIMESTAMP not null comment '使用时间',
+    create_time       datetime    default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time       datetime    default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    is_delete         tinyint     default 0                 not null comment '是否删除',
+    key idx_ai_usage_user_time (user_id, used_at),
+    key idx_ai_usage_task_id (task_id),
+    key idx_ai_usage_model_time (provider, model, used_at),
+    key idx_ai_usage_phase_time (phase, used_at)
+) comment 'AI 用量记录表' collate = utf8mb4_unicode_ci;
+
+-- 用户积分账户表
+create table if not exists credit_account
+(
+    id             bigint auto_increment comment 'id' primary key,
+    user_id        bigint                                not null comment '用户 ID',
+    balance        decimal(18, 4) default 0.0000         not null comment '当前积分余额',
+    total_recharge decimal(18, 4) default 0.0000         not null comment '累计充值积分',
+    total_consume  decimal(18, 4) default 0.0000         not null comment '累计消费积分',
+    create_time    datetime    default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time    datetime    default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    is_delete      tinyint     default 0                 not null comment '是否删除',
+    unique key uk_credit_account_user (user_id)
+) comment '用户积分账户表' collate = utf8mb4_unicode_ci;
+
+-- 用户积分流水表
+create table if not exists credit_transaction
+(
+    id               bigint auto_increment comment 'id' primary key,
+    user_id          bigint                                not null comment '用户 ID',
+    account_id       bigint                                not null comment '积分账户 ID',
+    transaction_type varchar(32)                           not null comment '流水类型',
+    status           varchar(32)                           not null comment '流水状态',
+    amount           decimal(18, 4) default 0.0000         not null comment '流水积分金额',
+    balance_after    decimal(18, 4) default 0.0000         not null comment '流水后余额',
+    biz_type         varchar(64)                           null comment '业务类型',
+    biz_id           varchar(128)                          null comment '业务 ID',
+    description      varchar(512)                          null comment '流水说明',
+    operator         varchar(100)                          null comment '操作人',
+    create_time      datetime    default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time      datetime    default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    is_delete        tinyint     default 0                 not null comment '是否删除',
+    key idx_credit_tx_user_time (user_id, create_time),
+    key idx_credit_tx_biz (biz_type, biz_id),
+    key idx_credit_tx_status (status)
+) comment '用户积分流水表' collate = utf8mb4_unicode_ci;
+
 -- 审计日志表
 create table if not exists sys_audit_log
 (

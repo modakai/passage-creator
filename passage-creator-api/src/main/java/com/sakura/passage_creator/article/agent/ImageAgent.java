@@ -37,7 +37,7 @@ public class ImageAgent {
      * 使用配图分析 Agent 生成配图计划，分析阶段会尊重 state.enabledImageMethods。
      */
     public void analyze(ArticleState state) {
-        imageAnalyzerAgent.analyze(state);
+        imageAnalyzerAgent.analyze(state, state.getUserId());
     }
 
     /**
@@ -51,13 +51,29 @@ public class ImageAgent {
     public List<ArticleState.ImageResult> generateImages(String taskId,
             List<ArticleState.ImageRequirement> imageRequirements,
             Consumer<ArticleState.ImageResult> imageCompleteConsumer) {
+        return generateImages(taskId, null, imageRequirements, imageCompleteConsumer);
+    }
+
+    /**
+     * 根据配图需求调用对应工具，并把用户 id 传递给付费图片策略用于计费。
+     *
+     * @param taskId                文章任务 id
+     * @param userId                用户 id
+     * @param imageRequirements     配图需求列表
+     * @param imageCompleteConsumer 单张图片完成回调
+     * @return 配图结果列表
+     */
+    public List<ArticleState.ImageResult> generateImages(String taskId,
+            Long userId,
+            List<ArticleState.ImageRequirement> imageRequirements,
+            Consumer<ArticleState.ImageResult> imageCompleteConsumer) {
         if (imageRequirements == null || imageRequirements.isEmpty()) {
             return List.of();
         }
 
         List<ArticleState.ImageResult> results = new ArrayList<>();
         for (ArticleState.ImageRequirement requirement : imageRequirements) {
-            ImageGenerationResult generationResult = generateWithFallback(requirement);
+            ImageGenerationResult generationResult = generateWithFallback(taskId, userId, requirement);
             String imageUrl = imageStorageService.uploadArticleImage(taskId, generationResult.getImageData());
             ArticleState.ImageResult imageResult = buildImageResult(requirement, generationResult, imageUrl);
             results.add(imageResult);
@@ -71,24 +87,25 @@ public class ImageAgent {
     /**
      * 优先调用需求指定的工具，失败后降级到 Picsum，保证文章不会因单图失败而整体中断。
      */
-    private ImageGenerationResult generateWithFallback(ArticleState.ImageRequirement requirement) {
+    private ImageGenerationResult generateWithFallback(String taskId, Long userId, ArticleState.ImageRequirement requirement) {
         ImageMethodEnum method = resolveMethod(requirement);
         try {
-            return generateByMethod(method, requirement);
+            return generateByMethod(taskId, userId, method, requirement);
         }
         catch (RuntimeException e) {
             log.warn("配图工具执行失败，尝试降级, method={}, position={}, reason={}",
                     method, requirement.getPosition(), e.getMessage());
             log.debug("配图工具失败详情", e);
-            return generateByMethod(ImageMethodEnum.getFallbackMethod(), requirement);
+            return generateByMethod(taskId, userId, ImageMethodEnum.getFallbackMethod(), requirement);
         }
     }
 
     /**
      * 调用指定工具并校验返回数据，防止无效图片进入 OSS 上传。
      */
-    private ImageGenerationResult generateByMethod(ImageMethodEnum method, ArticleState.ImageRequirement requirement) {
-        ImageGenerationResult result = imageToolRegistry.getRequiredTool(method).generate(requirement);
+    private ImageGenerationResult generateByMethod(String taskId, Long userId, ImageMethodEnum method,
+            ArticleState.ImageRequirement requirement) {
+        ImageGenerationResult result = imageToolRegistry.getRequiredTool(method).generate(taskId, userId, requirement);
         if (result == null || result.getImageData() == null || !result.getImageData().isValid()) {
             throw new IllegalStateException("配图工具返回无效图片数据: " + method.getValue());
         }

@@ -5,6 +5,8 @@ import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.config.OpenAiImageProperties;
 import com.sakura.passage_creator.article.model.dto.image.ImageData;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
+import com.sakura.passage_creator.billing.api.AiBillingReservation;
+import com.sakura.passage_creator.billing.api.AiBillingService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -40,11 +42,17 @@ public class GptImageService implements ImageGenerateStrategy {
      */
     private final RestClient restClient;
 
+    /**
+     * AI 计费服务，GPT_IMAGE 按固定图片成本计费。
+     */
+    private final AiBillingService aiBillingService;
+
     public GptImageService(OpenAiImageProperties properties, OpenAiImageResponseParser responseParser,
-            RemoteImageDownloader remoteImageDownloader) {
+            RemoteImageDownloader remoteImageDownloader, AiBillingService aiBillingService) {
         this.properties = properties;
         this.responseParser = responseParser;
         this.remoteImageDownloader = remoteImageDownloader;
+        this.aiBillingService = aiBillingService;
         this.restClient = RestClient.builder().build();
     }
 
@@ -83,6 +91,25 @@ public class GptImageService implements ImageGenerateStrategy {
                 .method(getMethod())
                 .imageData(generateImage(requirement))
                 .build();
+    }
+
+    /**
+     * 带计费上下文生成图片，调用前预扣，成功后按图片固定成本结算。
+     */
+    @Override
+    public ImageGenerationResult generate(String taskId, Long userId, ArticleState.ImageRequirement requirement) {
+        long startMillis = System.currentTimeMillis();
+        AiBillingReservation reservation = aiBillingService.reserveImageCall(userId, taskId,
+                "GptImageService", "IMAGE_GENERATING", "OPENAI", properties.getModel());
+        try {
+            ImageGenerationResult result = generate(requirement);
+            aiBillingService.completeImageCall(reservation, resolveLatency(startMillis), true, null);
+            return result;
+        }
+        catch (RuntimeException e) {
+            aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
+            throw e;
+        }
     }
 
     /**
@@ -146,5 +173,9 @@ public class GptImageService implements ImageGenerateStrategy {
         String keywords = StrUtil.blankToDefault(requirement.getKeywords(), sectionTitle);
         return "Create a clean editorial illustration for an article section titled \"%s\". Keywords: %s. No watermark."
                 .formatted(sectionTitle, keywords);
+    }
+
+    private Integer resolveLatency(long startMillis) {
+        return Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
     }
 }

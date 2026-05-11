@@ -30,6 +30,11 @@ public class ArticleState implements Serializable {
     private String taskId;
 
     /**
+     * 任务所属用户 id，异步 Agent 计费时不能依赖请求线程上下文。
+     */
+    private Long userId;
+
+    /**
      * 选题
      */
     private String topic;

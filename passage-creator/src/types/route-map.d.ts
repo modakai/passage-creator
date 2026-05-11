@@ -62,6 +62,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/ai-usage/': RouteRecordInfo<
+      '/ai-usage/',
+      '/ai-usage',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/apps/': RouteRecordInfo<
       '/apps/',
       '/apps',
@@ -147,6 +154,13 @@ declare module 'vue-router/auto-routes' {
     '/billing/': RouteRecordInfo<
       '/billing/',
       '/billing',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/credit-management/': RouteRecordInfo<
+      '/credit-management/',
+      '/credit-management',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -395,6 +409,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/ai-usage/index.vue': {
+      routes:
+        | '/ai-usage/'
+      views:
+        | never
+    }
     'src/pages/apps/index.vue': {
       routes:
         | '/apps/'
@@ -470,6 +490,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/billing/index.vue': {
       routes:
         | '/billing/'
+      views:
+        | never
+    }
+    'src/pages/credit-management/index.vue': {
+      routes:
+        | '/credit-management/'
       views:
         | never
     }

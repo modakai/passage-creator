@@ -60,10 +60,11 @@ public class ArticleAsyncService {
             // 创建状态对象
             ArticleState articleState = new ArticleState();
             articleState.setTaskId(taskId);
+            articleState.setUserId(resolveArticleUserId(taskId));
             articleState.setTopic(topic);
 
             // 执行阶段1：生成标题方案（根据配置选择执行方式）
-            titleGeneratorAgent.generatorTitle(articleState);
+            titleGeneratorAgent.generatorTitle(articleState, articleState.getUserId());
 
             // 保存标题方案到数据库
             List<ArticleState.TitleOption> titleOptions = articleState.getTitleOptions();
@@ -101,12 +102,13 @@ public class ArticleAsyncService {
             titleResult.setSubTitle(subTitle);
             ArticleState state = ArticleState.builder()
                     .taskId(taskId)
+                    .userId(resolveArticleUserId(taskId))
                     .title(titleResult)
                     .userDescription(userDescription)
                     .build();
 
             // 调用生成
-            outlineGeneratorAgent.generatorOutline(state);
+            outlineGeneratorAgent.generatorOutline(state, state.getUserId());
 
             // 更新状态
             ArticleState.OutlineResult outline = state.getOutline();
@@ -152,12 +154,13 @@ public class ArticleAsyncService {
 
             ArticleState articleState = ArticleState.builder()
                     .taskId(taskId)
+                    .userId(article.getUserId())
                     .title(titleResult)
                     .outline(outline)
                     .enabledImageMethods(parseEnabledImageMethods(article.getEnabledImageMethods()))
                     .build();
 
-            contentGeneratorAgent.generatorContent(articleState);
+            contentGeneratorAgent.generatorContent(articleState, article.getUserId());
 
             // 正文完成后进入配图分析，第一阶段不引入 workflow，但保留清晰阶段边界。
             Db.tx(() -> articleService.updatePhase(ArticlePhaseEnum.IMAGE_ANALYZING, taskId));
@@ -172,6 +175,7 @@ public class ArticleAsyncService {
             sendPhaseChanged(taskId, ArticlePhaseEnum.IMAGE_GENERATING);
             List<ArticleState.ImageResult> images = imageAgent.generateImages(
                     taskId,
+                    article.getUserId(),
                     articleState.getImageRequirements(),
                     image -> {
                         SseMessage<ArticleState.ImageResult> imageMessage =
@@ -220,6 +224,17 @@ public class ArticleAsyncService {
             log.warn("解析用户配图方式失败，将使用默认配图方式, value={}", enabledImageMethods, e);
             return List.of();
         }
+    }
+
+    /**
+     * 根据任务 id 获取所属用户，异步线程中用于 AI 计费。
+     */
+    private Long resolveArticleUserId(String taskId) {
+        Article article = articleService.getOne(QueryWrapper.create().where(ARTICLE.TASK_ID.eq(taskId)));
+        if (article == null) {
+            throw new IllegalStateException("文章任务不存在");
+        }
+        return article.getUserId();
     }
 
     /**

@@ -7,12 +7,15 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.constant.PromptConstant;
+import com.sakura.passage_creator.billing.api.AiBillingReservation;
+import com.sakura.passage_creator.billing.api.AiBillingService;
 import com.sakura.passage_creator.prompt.api.PromptTemplateRenderResult;
 import com.sakura.passage_creator.prompt.api.PromptTemplateService;
 import com.sakura.passage_creator.prompt.api.PromptUsageLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -42,10 +45,16 @@ public class ContentGeneratorAgent {
      */
     private final PromptUsageLogService promptUsageLogService;
 
+    /**
+     * AI 计费服务，负责正文模型调用的预扣和结算。
+     */
+    private final AiBillingService aiBillingService;
+
     public ContentGeneratorAgent(DashScopeApi dashScopeApi, PromptTemplateService promptTemplateService,
-            PromptUsageLogService promptUsageLogService) {
+            PromptUsageLogService promptUsageLogService, AiBillingService aiBillingService) {
         this.promptTemplateService = promptTemplateService;
         this.promptUsageLogService = promptUsageLogService;
+        this.aiBillingService = aiBillingService;
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
@@ -64,7 +73,7 @@ public class ContentGeneratorAgent {
      *
      * @param state 文章生成状态，必须包含标题和大纲
      */
-    public void generatorContent(ArticleState state) {
+    public void generatorContent(ArticleState state, Long userId) {
         log.info("阶段3：开始生成正文, taskId={}", state.getTaskId());
         ArticleState.TitleResult title = state.getTitle();
         ArticleState.OutlineResult outline = state.getOutline();
@@ -81,18 +90,28 @@ public class ContentGeneratorAgent {
                         "outline", JSONUtil.toJsonPrettyStr(outline)
                 ));
         long startMillis = System.currentTimeMillis();
+        AiBillingReservation reservation = aiBillingService.reserveTextCall(userId, state.getTaskId(),
+                "ContentGeneratorAgent", "CONTENT_GENERATING", "DASHSCOPE", DashScopeModel.ChatModel.QWEN3_MAX.value);
+        boolean billed = false;
         try {
-            String response = chatClient.prompt()
+            ChatResponse chatResponse = chatClient.prompt()
                     .system(s -> s.text(systemPrompt.content()))
                     .user(u -> u.text(userPrompt.content()))
                     .call()
-                    .content();
+                    .chatResponse();
+            String response = AiChatBillingSupport.contentOf(chatResponse);
+            aiBillingService.completeTextCall(reservation, AiChatBillingSupport.usageOf(chatResponse),
+                    resolveLatency(startMillis), true, null);
+            billed = true;
 
             state.setContent(response);
             recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), true, null, startMillis);
             log.info("阶段3：生成正文完毕, taskId={}", state.getTaskId());
         }
         catch (RuntimeException e) {
+            if (!billed) {
+                aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
+            }
             recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), false, e.getMessage(), startMillis);
             throw e;
         }
@@ -106,5 +125,9 @@ public class ContentGeneratorAgent {
         Integer latencyMs = Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
         promptUsageLogService.recordUsage(systemPrompt, "ContentGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
         promptUsageLogService.recordUsage(userPrompt, "ContentGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
+    }
+
+    private Integer resolveLatency(long startMillis) {
+        return Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
     }
 }

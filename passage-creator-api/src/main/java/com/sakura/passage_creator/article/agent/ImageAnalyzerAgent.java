@@ -11,9 +11,12 @@ import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.config.OpenAiImageProperties;
 import com.sakura.passage_creator.article.image.service.ImageRequirementPolicy;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
+import com.sakura.passage_creator.billing.api.AiBillingReservation;
+import com.sakura.passage_creator.billing.api.AiBillingService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Component;
 
@@ -38,11 +41,18 @@ public class ImageAnalyzerAgent {
     private final ChatClient chatClient;
 
     /**
+     * AI 计费服务，用于记录配图分析阶段的 Token 成本。
+     */
+    private final AiBillingService aiBillingService;
+
+    /**
      * 除封面外最多生成的章节配图数量。
      */
     private final int maxSectionImages;
 
-    public ImageAnalyzerAgent(DashScopeApi dashScopeApi, OpenAiImageProperties imageProperties) {
+    public ImageAnalyzerAgent(DashScopeApi dashScopeApi, OpenAiImageProperties imageProperties,
+            AiBillingService aiBillingService) {
+        this.aiBillingService = aiBillingService;
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
@@ -65,16 +75,33 @@ public class ImageAnalyzerAgent {
      *
      * @param state 文章生成状态
      */
-    public void analyze(ArticleState state) {
+    public void analyze(ArticleState state, Long userId) {
         log.info("阶段4：开始分析配图需求, taskId={}", state.getTaskId());
         String mainTitle = state.getTitle().getMainTitle();
         String content = state.getContent();
         String prompt = buildPrompt(mainTitle, content, state.getEnabledImageMethods());
 
-        String response = chatClient.prompt()
-                .user(prompt)
-                .call()
-                .content();
+        long startMillis = System.currentTimeMillis();
+        AiBillingReservation reservation = aiBillingService.reserveTextCall(userId, state.getTaskId(),
+                "ImageAnalyzerAgent", "IMAGE_ANALYZING", "DASHSCOPE", DashScopeModel.ChatModel.QWEN3_MAX.value);
+        boolean billed = false;
+        String response;
+        try {
+            ChatResponse chatResponse = chatClient.prompt()
+                    .user(prompt)
+                    .call()
+                    .chatResponse();
+            response = AiChatBillingSupport.contentOf(chatResponse);
+            aiBillingService.completeTextCall(reservation, AiChatBillingSupport.usageOf(chatResponse),
+                    resolveLatency(startMillis), true, null);
+            billed = true;
+        }
+        catch (RuntimeException e) {
+            if (!billed) {
+                aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
+            }
+            throw e;
+        }
 
         ArticleState.Agent4Result result = parseResult(response);
         List<ArticleState.ImageRequirement> imageRequirements =
@@ -84,6 +111,10 @@ public class ImageAnalyzerAgent {
         state.setContent(StrUtil.blankToDefault(result.getContentWithPlaceholders(), content));
         state.setImageRequirements(imageRequirements);
         log.info("阶段4：配图需求分析完成, taskId={}, count={}", state.getTaskId(), imageRequirements.size());
+    }
+
+    private Integer resolveLatency(long startMillis) {
+        return Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
     }
 
     /**

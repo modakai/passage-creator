@@ -337,3 +337,18 @@ on conflict (template_key, version, environment) do update set
     content = excluded.content,
     variables_schema = excluded.variables_schema,
     description = excluded.description;
+
+-- AI 模型默认费率，积分单价可在后台后续扩展为配置页面。
+insert into public.ai_model_pricing (
+    provider, model, request_type, prompt_token_price_per1k, completion_token_price_per1k,
+    fixed_credits, reserve_credits, enabled
+)
+values
+('DASHSCOPE', 'qwen3-max', 'TEXT', 0.002000, 0.006000, 0.0000, 1.0000, 1),
+('OPENAI', 'gpt-image-2', 'IMAGE', 0.000000, 0.000000, 5.0000, 5.0000, 1)
+on conflict (provider, model, request_type) do update set
+    prompt_token_price_per1k = excluded.prompt_token_price_per1k,
+    completion_token_price_per1k = excluded.completion_token_price_per1k,
+    fixed_credits = excluded.fixed_credits,
+    reserve_credits = excluded.reserve_credits,
+    enabled = excluded.enabled;

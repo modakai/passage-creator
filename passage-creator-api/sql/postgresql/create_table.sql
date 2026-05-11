@@ -227,6 +227,89 @@ create index if not exists idx_prompt_usage_agent_time on public.prompt_usage_lo
 create index if not exists idx_prompt_usage_task_id on public.prompt_usage_log (task_id);
 create index if not exists idx_prompt_usage_template_id on public.prompt_usage_log (prompt_template_id);
 
+-- AI 模型费率配置表。
+create table if not exists public.ai_model_pricing
+(
+    id                           bigserial primary key,
+    provider                     varchar(64)                            not null,
+    model                        varchar(128)                           not null,
+    request_type                 varchar(32)                            not null,
+    prompt_token_price_per1k     numeric(18, 6) default 0.000000        not null,
+    completion_token_price_per1k numeric(18, 6) default 0.000000        not null,
+    fixed_credits                numeric(18, 4) default 0.0000          not null,
+    reserve_credits              numeric(18, 4) default 1.0000          not null,
+    enabled                      smallint       default 1               not null,
+    create_time                  timestamp      default current_timestamp not null,
+    update_time                  timestamp      default current_timestamp not null,
+    is_delete                    smallint       default 0               not null,
+    constraint uk_ai_pricing_provider_model_type unique (provider, model, request_type)
+);
+create index if not exists idx_ai_pricing_enabled on public.ai_model_pricing (enabled);
+
+-- AI 用量记录表。
+create table if not exists public.ai_usage_record
+(
+    id                bigserial primary key,
+    user_id           bigint                                not null,
+    task_id           varchar(100),
+    agent_name        varchar(100)                          not null,
+    phase             varchar(64),
+    provider          varchar(64)                           not null,
+    model             varchar(128)                          not null,
+    request_type      varchar(32)                           not null,
+    prompt_tokens     bigint      default 0                 not null,
+    completion_tokens bigint      default 0                 not null,
+    total_tokens      bigint      default 0                 not null,
+    credit_cost       numeric(18, 4) default 0.0000         not null,
+    latency_ms        integer,
+    response_ok       boolean,
+    error_message     text,
+    used_at           timestamp   default current_timestamp not null,
+    create_time       timestamp   default current_timestamp not null,
+    update_time       timestamp   default current_timestamp not null,
+    is_delete         smallint    default 0                 not null
+);
+create index if not exists idx_ai_usage_user_time on public.ai_usage_record (user_id, used_at);
+create index if not exists idx_ai_usage_task_id on public.ai_usage_record (task_id);
+create index if not exists idx_ai_usage_model_time on public.ai_usage_record (provider, model, used_at);
+create index if not exists idx_ai_usage_phase_time on public.ai_usage_record (phase, used_at);
+
+-- 用户积分账户表。
+create table if not exists public.credit_account
+(
+    id             bigserial primary key,
+    user_id        bigint                                not null,
+    balance        numeric(18, 4) default 0.0000         not null,
+    total_recharge numeric(18, 4) default 0.0000         not null,
+    total_consume  numeric(18, 4) default 0.0000         not null,
+    create_time    timestamp   default current_timestamp not null,
+    update_time    timestamp   default current_timestamp not null,
+    is_delete      smallint    default 0                 not null,
+    constraint uk_credit_account_user unique (user_id)
+);
+
+-- 用户积分流水表。
+create table if not exists public.credit_transaction
+(
+    id               bigserial primary key,
+    user_id          bigint                                not null,
+    account_id       bigint                                not null,
+    transaction_type varchar(32)                           not null,
+    status           varchar(32)                           not null,
+    amount           numeric(18, 4) default 0.0000         not null,
+    balance_after    numeric(18, 4) default 0.0000         not null,
+    biz_type         varchar(64),
+    biz_id           varchar(128),
+    description      varchar(512),
+    operator         varchar(100),
+    create_time      timestamp    default current_timestamp not null,
+    update_time      timestamp    default current_timestamp not null,
+    is_delete        smallint     default 0                 not null
+);
+create index if not exists idx_credit_tx_user_time on public.credit_transaction (user_id, create_time);
+create index if not exists idx_credit_tx_biz on public.credit_transaction (biz_type, biz_id);
+create index if not exists idx_credit_tx_status on public.credit_transaction (status);
+
 -- 审计日志表。
 create table if not exists public.sys_audit_log
 (

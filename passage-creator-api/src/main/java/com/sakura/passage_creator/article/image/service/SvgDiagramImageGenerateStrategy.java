@@ -5,12 +5,16 @@ import com.alibaba.cloud.ai.dashscope.api.DashScopeApi;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatModel;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
+import com.sakura.passage_creator.article.agent.AiChatBillingSupport;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.model.dto.image.ImageData;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
+import com.sakura.passage_creator.billing.api.AiBillingReservation;
+import com.sakura.passage_creator.billing.api.AiBillingService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -24,7 +28,13 @@ public class SvgDiagramImageGenerateStrategy implements ImageGenerateStrategy {
 
     private final ChatClient chatClient;
 
-    public SvgDiagramImageGenerateStrategy(DashScopeApi dashScopeApi) {
+    /**
+     * AI 计费服务，SVG 概念图使用文本模型 Token 计费。
+     */
+    private final AiBillingService aiBillingService;
+
+    public SvgDiagramImageGenerateStrategy(DashScopeApi dashScopeApi, AiBillingService aiBillingService) {
+        this.aiBillingService = aiBillingService;
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
@@ -52,10 +62,48 @@ public class SvgDiagramImageGenerateStrategy implements ImageGenerateStrategy {
             throw new IllegalArgumentException("SVG 概念图需求为空");
         }
 
-        String rawSvg = chatClient.prompt()
+        ChatResponse chatResponse = callModel(requirementText);
+        String rawSvg = AiChatBillingSupport.contentOf(chatResponse);
+        return buildResult(requirement, rawSvg);
+    }
+
+    /**
+     * 带计费上下文生成 SVG，并记录文本模型 Token 成本。
+     */
+    @Override
+    public ImageGenerationResult generate(String taskId, Long userId, ArticleState.ImageRequirement requirement) {
+        String requirementText = ImageRequirementTextResolver.resolve(requirement, getMethod());
+        if (StrUtil.isBlank(requirementText)) {
+            throw new IllegalArgumentException("SVG 概念图需求为空");
+        }
+        long startMillis = System.currentTimeMillis();
+        AiBillingReservation reservation = aiBillingService.reserveTextCall(userId, taskId,
+                "SvgDiagramImageGenerateStrategy", "IMAGE_GENERATING", "DASHSCOPE",
+                DashScopeModel.ChatModel.QWEN3_MAX.value);
+        boolean billed = false;
+        try {
+            ChatResponse chatResponse = callModel(requirementText);
+            aiBillingService.completeTextCall(reservation, AiChatBillingSupport.usageOf(chatResponse),
+                    resolveLatency(startMillis), true, null);
+            billed = true;
+            return buildResult(requirement, AiChatBillingSupport.contentOf(chatResponse));
+        }
+        catch (RuntimeException e) {
+            if (!billed) {
+                aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
+            }
+            throw e;
+        }
+    }
+
+    private ChatResponse callModel(String requirementText) {
+        return chatClient.prompt()
                 .user(buildPrompt(requirementText))
                 .call()
-                .content();
+                .chatResponse();
+    }
+
+    private ImageGenerationResult buildResult(ArticleState.ImageRequirement requirement, String rawSvg) {
         String svgCode = sanitizeSvg(extractSvgCode(rawSvg));
         if (!isValidSvg(svgCode)) {
             throw new IllegalStateException("模型返回的 SVG 格式无效");
@@ -129,5 +177,9 @@ public class SvgDiagramImageGenerateStrategy implements ImageGenerateStrategy {
      */
     private boolean isValidSvg(String svgCode) {
         return StrUtil.isNotBlank(svgCode) && svgCode.contains("<svg") && svgCode.contains("</svg>");
+    }
+
+    private Integer resolveLatency(long startMillis) {
+        return Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
     }
 }

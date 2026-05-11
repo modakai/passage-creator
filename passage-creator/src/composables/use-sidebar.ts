@@ -69,6 +69,8 @@ export function buildAdminNavGroups(t: (key: string) => string): NavGroup[] {
                 { id: 'notifications', title: t('menu.settings.notificationAnnouncements'), url: '/notifications', icon: BellDotIcon },
                 { id: 'notification-templates', title: t('menu.settings.notificationTemplates'), url: '/notification-templates', icon: FileCode2Icon },
                 { id: 'prompt-templates', title: 'Prompt 管理', url: '/prompt-templates', icon: BotIcon },
+                { id: 'ai-usage', title: 'AI 成本', url: '/ai-usage', icon: ActivityIcon },
+                { id: 'credit-management', title: '积分管理', url: '/credit-management', icon: CreditCardIcon },
                 { id: 'audit-logs', title: t('menu.settings.auditLogs'), url: '/audit-logs', icon: ScrollTextIcon },
               ],
             },

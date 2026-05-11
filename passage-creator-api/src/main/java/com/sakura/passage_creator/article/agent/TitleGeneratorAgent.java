@@ -8,12 +8,15 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.constant.PromptConstant;
+import com.sakura.passage_creator.billing.api.AiBillingReservation;
+import com.sakura.passage_creator.billing.api.AiBillingService;
 import com.sakura.passage_creator.prompt.api.PromptTemplateRenderResult;
 import com.sakura.passage_creator.prompt.api.PromptTemplateService;
 import com.sakura.passage_creator.prompt.api.PromptUsageLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -47,9 +50,10 @@ public class TitleGeneratorAgent {
     private final PromptUsageLogService promptUsageLogService;
 
     public TitleGeneratorAgent(DashScopeApi dashScopeApi, PromptTemplateService promptTemplateService,
-            PromptUsageLogService promptUsageLogService) {
+            PromptUsageLogService promptUsageLogService, AiBillingService aiBillingService) {
         this.promptTemplateService = promptTemplateService;
         this.promptUsageLogService = promptUsageLogService;
+        this.aiBillingService = aiBillingService;
         this.chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
@@ -64,11 +68,16 @@ public class TitleGeneratorAgent {
     }
 
     /**
+     * AI 计费服务，负责调用前预扣和调用后按 Token 结算。
+     */
+    private final AiBillingService aiBillingService;
+
+    /**
      * 生成标题
      *
      * @param state 状态
      */
-    public void generatorTitle(ArticleState state) {
+    public void generatorTitle(ArticleState state, Long userId) {
         log.info("阶段1：开始生成标题方案, taskId={}", state.getTaskId());
         String topic = state.getTopic();
 
@@ -78,12 +87,19 @@ public class TitleGeneratorAgent {
                 PromptConstant.AGENT1_TITLE_USER_KEY, PromptConstant.AGENT1_TITLE_PROMPT,
                 PromptConstant.AGENT1_TITLE_VARIABLE_SCHEMA, Map.of("topic", topic));
         long startMillis = System.currentTimeMillis();
+        AiBillingReservation reservation = aiBillingService.reserveTextCall(userId, state.getTaskId(),
+                "TitleGeneratorAgent", "TITLE_GENERATING", "DASHSCOPE", DashScopeModel.ChatModel.QWEN3_MAX.value);
+        boolean billed = false;
         try {
-            String response = chatClient.prompt()
+            ChatResponse chatResponse = chatClient.prompt()
                     .system(s -> s.text(systemPrompt.content()))
                     .user(u -> u.text(userPrompt.content()))
                     .call()
-                    .content();
+                    .chatResponse();
+            String response = AiChatBillingSupport.contentOf(chatResponse);
+            aiBillingService.completeTextCall(reservation, AiChatBillingSupport.usageOf(chatResponse),
+                    resolveLatency(startMillis), true, null);
+            billed = true;
             List<ArticleState.TitleOption> optionList = JSONUtil.toBean(response,
                     new TypeReference<List<ArticleState.TitleOption>>() {
                     }, true);
@@ -93,6 +109,9 @@ public class TitleGeneratorAgent {
             log.info("阶段1：生成标题方案完毕，taskId={}", state.getTaskId());
         }
         catch (RuntimeException e) {
+            if (!billed) {
+                aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
+            }
             recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), false, e.getMessage(), startMillis);
             throw e;
         }
@@ -106,5 +125,9 @@ public class TitleGeneratorAgent {
         Integer latencyMs = Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
         promptUsageLogService.recordUsage(systemPrompt, "TitleGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
         promptUsageLogService.recordUsage(userPrompt, "TitleGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
+    }
+
+    private Integer resolveLatency(long startMillis) {
+        return Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
     }
 }

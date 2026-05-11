@@ -334,3 +334,18 @@ on duplicate key update
     content = values(content),
     variables_schema = values(variables_schema),
     description = values(description);
+
+-- AI 模型默认费率，积分单价可在后台后续扩展为配置页面。
+insert into ai_model_pricing (
+    provider, model, request_type, prompt_token_price_per1k, completion_token_price_per1k,
+    fixed_credits, reserve_credits, enabled
+)
+values
+('DASHSCOPE', 'qwen3-max', 'TEXT', 0.002000, 0.006000, 0.0000, 1.0000, 1),
+('OPENAI', 'gpt-image-2', 'IMAGE', 0.000000, 0.000000, 5.0000, 5.0000, 1)
+on duplicate key update
+    prompt_token_price_per1k = values(prompt_token_price_per1k),
+    completion_token_price_per1k = values(completion_token_price_per1k),
+    fixed_credits = values(fixed_credits),
+    reserve_credits = values(reserve_credits),
+    enabled = values(enabled);

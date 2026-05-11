@@ -8,12 +8,15 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.constant.PromptConstant;
+import com.sakura.passage_creator.billing.api.AiBillingReservation;
+import com.sakura.passage_creator.billing.api.AiBillingService;
 import com.sakura.passage_creator.prompt.api.PromptTemplateRenderResult;
 import com.sakura.passage_creator.prompt.api.PromptTemplateService;
 import com.sakura.passage_creator.prompt.api.PromptUsageLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Component;
 
@@ -42,15 +45,21 @@ public class OutlineGeneratorAgent {
     private final PromptUsageLogService promptUsageLogService;
 
     /**
+     * AI 计费服务，负责真实 Token 用量结算。
+     */
+    private final AiBillingService aiBillingService;
+
+    /**
      * Spring AI 结构化输出转换器，用于生成 JSON Schema 提示并解析模型输出。
      */
     private final BeanOutputConverter<ArticleState.OutlineResult> outlineOutputConverter =
             new BeanOutputConverter<>(ArticleState.OutlineResult.class);
 
     public OutlineGeneratorAgent(DashScopeApi dashScopeApi, PromptTemplateService promptTemplateService,
-            PromptUsageLogService promptUsageLogService) {
+            PromptUsageLogService promptUsageLogService, AiBillingService aiBillingService) {
         this.promptTemplateService = promptTemplateService;
         this.promptUsageLogService = promptUsageLogService;
+        this.aiBillingService = aiBillingService;
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
@@ -73,7 +82,7 @@ public class OutlineGeneratorAgent {
      *
      * @param state 状态
      */
-    public void generatorOutline(ArticleState state) {
+    public void generatorOutline(ArticleState state, Long userId) {
         log.info("阶段2：开始生成大纲, taskId={}", state.getTaskId());
         ArticleState.TitleResult title = state.getTitle();
         String mainTitle = title.getMainTitle();
@@ -92,12 +101,19 @@ public class OutlineGeneratorAgent {
                         "format", outlineOutputConverter.getFormat()
                 ));
         long startMillis = System.currentTimeMillis();
+        AiBillingReservation reservation = aiBillingService.reserveTextCall(userId, state.getTaskId(),
+                "OutlineGeneratorAgent", "OUTLINE_GENERATING", "DASHSCOPE", DashScopeModel.ChatModel.QWEN3_MAX.value);
+        boolean billed = false;
         try {
-            String response = chatClient.prompt()
+            ChatResponse chatResponse = chatClient.prompt()
                     .system(s -> s.text(systemPrompt.content()))
                     .user(u -> u.text(userPrompt.content()))
                     .call()
-                    .content();
+                    .chatResponse();
+            String response = AiChatBillingSupport.contentOf(chatResponse);
+            aiBillingService.completeTextCall(reservation, AiChatBillingSupport.usageOf(chatResponse),
+                    resolveLatency(startMillis), true, null);
+            billed = true;
             log.info("阶段2：生成大纲内容：{}", response);
             ArticleState.OutlineResult optionList = parseStructuredOutline(response);
 
@@ -106,6 +122,9 @@ public class OutlineGeneratorAgent {
             log.info("阶段2：生成大纲完毕，taskId={}", state.getTaskId());
         }
         catch (RuntimeException e) {
+            if (!billed) {
+                aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
+            }
             recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), false, e.getMessage(), startMillis);
             throw e;
         }
@@ -134,5 +153,9 @@ public class OutlineGeneratorAgent {
         Integer latencyMs = Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
         promptUsageLogService.recordUsage(systemPrompt, "OutlineGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
         promptUsageLogService.recordUsage(userPrompt, "OutlineGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
+    }
+
+    private Integer resolveLatency(long startMillis) {
+        return Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
     }
 }

@@ -3,7 +3,6 @@ import {
   CheckCircle2Icon,
   ClipboardCheckIcon,
   ClipboardIcon,
-  CrownIcon,
   FileTextIcon,
   LightbulbIcon,
   LoaderCircleIcon,
@@ -12,6 +11,7 @@ import {
   RocketIcon,
   SparklesIcon,
   Trash2Icon,
+  WalletCardsIcon,
 } from '@lucide/vue'
 import { useClipboard } from '@vueuse/core'
 import { toast } from 'vue-sonner'
@@ -31,6 +31,7 @@ import {
   confirmAppArticleTitle,
   createAppArticleTask,
 } from '@/services/api/app-article.api'
+import { useGetCreditSummaryQuery } from '@/services/api/credit.api'
 import { connectArticleSse } from '@/utils/article-sse'
 
 type ArticleStyle = '默认' | '科技风格' | '情感风格' | '教育风格' | '轻松幽默'
@@ -51,6 +52,8 @@ const generatedContent = ref('')
 const isConfirmingTitle = ref(false)
 const isConfirmingOutline = ref(false)
 let closeSse: (() => void) | null = null
+
+const { data: creditSummaryData, isFetching: isFetchingCreditSummary } = useGetCreditSummaryQuery()
 
 const maxTopicLength = 500
 
@@ -129,6 +132,7 @@ const outlinePointCount = computed(() =>
   outlineSections.value.reduce((total, section) => total + section.points.length, 0),
 )
 const generatedContentLength = computed(() => generatedContent.value.length)
+const creditSummary = computed(() => creditSummaryData.value?.data)
 const {
   copy: copyGeneratedContent,
   copied: isGeneratedContentCopied,
@@ -485,6 +489,13 @@ async function handleCopyGeneratedContent() {
   }
   await copyGeneratedContent()
   toast.success('正文 Markdown 已复制')
+}
+
+/**
+ * 统一展示积分数值，避免余额接口为空或小数过长时影响侧边栏扫描。
+ */
+function formatCredits(value?: number) {
+  return Number(value ?? 0).toFixed(4)
 }
 
 /**
@@ -1133,15 +1144,46 @@ onMounted(() => {
           <UiCard class="bg-emerald-50/60">
             <UiCardHeader>
               <UiCardTitle class="flex items-center gap-2 text-base">
-                <CrownIcon class="size-5" />
-                创作配额
+                <WalletCardsIcon class="size-5" />
+                积分余额
               </UiCardTitle>
             </UiCardHeader>
-            <UiCardContent class="flex items-center gap-4">
-              <UiBadge class="rounded-full bg-slate-950 px-4 py-2 text-white">
-                管理员
+            <UiCardContent class="space-y-3">
+              <div class="flex items-end justify-between gap-3">
+                <div>
+                  <div class="text-2xl font-semibold leading-none">
+                    {{ isFetchingCreditSummary ? '加载中' : formatCredits(creditSummary?.balance) }}
+                  </div>
+                  <div class="mt-1 text-xs text-muted-foreground">
+                    当前可用积分
+                  </div>
+                </div>
+                <UiBadge variant="secondary" class="rounded-full">
+                  按 AI 用量扣减
+                </UiBadge>
+              </div>
+              <UiSeparator />
+              <div class="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <div class="text-muted-foreground">
+                    累计充值
+                  </div>
+                  <div class="mt-1 font-medium">
+                    {{ formatCredits(creditSummary?.totalRecharge) }}
+                  </div>
+                </div>
+                <div>
+                  <div class="text-muted-foreground">
+                    累计使用
+                  </div>
+                  <div class="mt-1 font-medium">
+                    {{ formatCredits(creditSummary?.totalConsume) }}
+                  </div>
+                </div>
+              </div>
+              <UiBadge v-if="!isFetchingCreditSummary && (creditSummary?.balance ?? 0) <= 0" variant="destructive" class="rounded-full">
+                余额不足，请联系管理员充值
               </UiBadge>
-              <span class="text-muted-foreground">无限次</span>
             </UiCardContent>
           </UiCard>
 
