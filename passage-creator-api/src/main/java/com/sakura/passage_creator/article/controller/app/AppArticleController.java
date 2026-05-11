@@ -64,7 +64,7 @@ public class AppArticleController {
         LoginUserInfo loginUser = LoginUserContext.getLoginUser();
 
         // 创建文章
-        String taskId = articleService.createArticle(request.getTopic(), loginUser);
+        String taskId = articleService.createArticle(request.getTopic(), request.getEnabledImageMethods(), loginUser);
 
         // 异步构建
         articleAsyncService.executePhase1(taskId, request.getTopic());

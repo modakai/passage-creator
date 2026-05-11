@@ -90,7 +90,7 @@ public class ArticleState implements Serializable {
     private String coverImage;
 
     /**
-     * 允许使用的配图方式。第一阶段只启用 GPT_IMAGE，后续再扩展策略。
+     * 允许使用的配图方式，后续接入 VIP 或用户选择时用于约束 ImageAnalyzerAgent。
      */
     private List<String> enabledImageMethods;
 

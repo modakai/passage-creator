@@ -125,6 +125,16 @@ public interface ArticleService extends IService<Article> {
     String createArticle(String topic, LoginUserInfo loginUser);
 
     /**
+     * 创建文章并保存用户允许使用的配图方式。
+     *
+     * @param topic               选题
+     * @param enabledImageMethods 用户允许的配图方式
+     * @param loginUser           登录用户
+     * @return 任务 id
+     */
+    String createArticle(String topic, List<String> enabledImageMethods, LoginUserInfo loginUser);
+
+    /**
      * 更新文章状态
      *
      * @param articleStatusEnum 枚举值

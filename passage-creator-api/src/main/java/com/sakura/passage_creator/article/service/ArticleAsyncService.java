@@ -4,11 +4,10 @@ import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.row.Db;
 import com.sakura.passage_creator.article.agent.ContentGeneratorAgent;
-import com.sakura.passage_creator.article.agent.ImageAnalyzerAgent;
+import com.sakura.passage_creator.article.agent.ImageAgent;
 import com.sakura.passage_creator.article.agent.OutlineGeneratorAgent;
 import com.sakura.passage_creator.article.agent.TitleGeneratorAgent;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
-import com.sakura.passage_creator.article.image.service.ArticleImageGenerationService;
 import com.sakura.passage_creator.article.image.service.ContentImageMerger;
 import com.sakura.passage_creator.article.manager.SseEmitterManager;
 import com.sakura.passage_creator.article.model.dto.SseMessage;
@@ -42,8 +41,7 @@ public class ArticleAsyncService {
     private final TitleGeneratorAgent titleGeneratorAgent;
     private final OutlineGeneratorAgent outlineGeneratorAgent;
     private final ContentGeneratorAgent contentGeneratorAgent;
-    private final ImageAnalyzerAgent imageAnalyzerAgent;
-    private final ArticleImageGenerationService articleImageGenerationService;
+    private final ImageAgent imageAgent;
     private final ContentImageMerger contentImageMerger;
 
     private final SseEmitterManager sseEmitterManager;
@@ -156,6 +154,7 @@ public class ArticleAsyncService {
                     .taskId(taskId)
                     .title(titleResult)
                     .outline(outline)
+                    .enabledImageMethods(parseEnabledImageMethods(article.getEnabledImageMethods()))
                     .build();
 
             contentGeneratorAgent.generatorContent(articleState);
@@ -163,15 +162,15 @@ public class ArticleAsyncService {
             // 正文完成后进入配图分析，第一阶段不引入 workflow，但保留清晰阶段边界。
             Db.tx(() -> articleService.updatePhase(ArticlePhaseEnum.IMAGE_ANALYZING, taskId));
             sendPhaseChanged(taskId, ArticlePhaseEnum.IMAGE_ANALYZING);
-            imageAnalyzerAgent.analyze(articleState);
+            imageAgent.analyze(articleState);
             SseMessage<List<ArticleState.ImageRequirement>> imageAnalyzedMessage =
                     SseMessage.of(SseMessageTypeEnum.IMAGE_ANALYZED, articleState.getImageRequirements());
             sseEmitterManager.send(taskId, JSONUtil.toJsonStr(imageAnalyzedMessage));
 
-            // 配图生成保持串行执行，便于先把 gpt-image-2 单链路跑通。
+            // 配图生成保持串行执行，便于定位多策略接口和 OSS 上传错误。
             Db.tx(() -> articleService.updatePhase(ArticlePhaseEnum.IMAGE_GENERATING, taskId));
             sendPhaseChanged(taskId, ArticlePhaseEnum.IMAGE_GENERATING);
-            List<ArticleState.ImageResult> images = articleImageGenerationService.generateImages(
+            List<ArticleState.ImageResult> images = imageAgent.generateImages(
                     taskId,
                     articleState.getImageRequirements(),
                     image -> {
@@ -205,6 +204,22 @@ public class ArticleAsyncService {
             handleFailure(taskId, "阶段3：生成正文和配图失败", exception);
         }
 
+    }
+
+    /**
+     * 从文章任务中恢复用户选择的配图方式，解析失败时返回空列表走默认全开放策略。
+     */
+    private List<String> parseEnabledImageMethods(String enabledImageMethods) {
+        if (enabledImageMethods == null || enabledImageMethods.isBlank()) {
+            return List.of();
+        }
+        try {
+            return JSONUtil.toList(enabledImageMethods, String.class);
+        }
+        catch (RuntimeException e) {
+            log.warn("解析用户配图方式失败，将使用默认配图方式, value={}", enabledImageMethods, e);
+            return List.of();
+        }
     }
 
     /**

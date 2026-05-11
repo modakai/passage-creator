@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.config.OpenAiImageProperties;
 import com.sakura.passage_creator.article.model.dto.image.ImageData;
+import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -17,7 +18,7 @@ import java.util.Map;
  */
 @Service
 @Slf4j
-public class GptImageService {
+public class GptImageService implements ImageGenerateStrategy {
 
     /**
      * OpenAI 图片配置。
@@ -71,6 +72,25 @@ public class GptImageService {
             return responseParser.parseImageData(responseBody);
         }
         return remoteImageDownloader.download(parsedImage.url());
+    }
+
+    /**
+     * 策略入口，复用已验证的 gpt-image-2 生成和远程下载逻辑。
+     */
+    @Override
+    public ImageGenerationResult generate(ArticleState.ImageRequirement requirement) {
+        return ImageGenerationResult.builder()
+                .method(getMethod())
+                .imageData(generateImage(requirement))
+                .build();
+    }
+
+    /**
+     * 当前策略对应 GPT Image 2。
+     */
+    @Override
+    public ImageMethodEnum getMethod() {
+        return ImageMethodEnum.GPT_IMAGE;
     }
 
     /**

@@ -54,11 +54,15 @@ public class RemoteImageDownloader {
      * 根据 MIME 类型选择 OSS 对象扩展名。
      */
     private String resolveExtension(String mimeType) {
-        if ("image/jpeg".equalsIgnoreCase(mimeType) || "image/jpg".equalsIgnoreCase(mimeType)) {
+        String normalizedMimeType = mimeType == null ? "" : mimeType.toLowerCase();
+        if (normalizedMimeType.startsWith("image/jpeg") || normalizedMimeType.startsWith("image/jpg")) {
             return ".jpg";
         }
-        if ("image/webp".equalsIgnoreCase(mimeType)) {
+        if (normalizedMimeType.startsWith("image/webp")) {
             return ".webp";
+        }
+        if (normalizedMimeType.startsWith("image/svg+xml")) {
+            return ".svg";
         }
         return DEFAULT_EXTENSION;
     }

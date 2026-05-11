@@ -74,6 +74,11 @@ public class Article implements Serializable {
     private String images;
 
     /**
+     * 用户允许使用的配图方式 JSON 数组文本。
+     */
+    private String enabledImageMethods;
+
+    /**
      * 状态：PENDING/PROCESSING/COMPLETED/FAILED。
      */
     private String status;

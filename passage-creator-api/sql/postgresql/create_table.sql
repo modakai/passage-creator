@@ -88,6 +88,7 @@ create table if not exists public.article
     full_content   text,
     cover_image    varchar(512),
     images         jsonb,
+    enabled_image_methods jsonb,
     status         varchar(20) default 'PENDING'         not null,
     error_message  text,
     create_time    timestamp   default current_timestamp not null,

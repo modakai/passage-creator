@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * 配图需求分析 Agent，负责在正文中插入占位符并生成 GPT_IMAGE 配图需求。
+ * 配图需求分析 Agent，负责在正文中插入占位符并生成多来源配图需求。
  */
 @Component
 @Slf4j
@@ -38,9 +38,9 @@ public class ImageAnalyzerAgent {
     private final ChatClient chatClient;
 
     /**
-     * 配图需求策略，控制数量并强制使用 GPT_IMAGE。
+     * 除封面外最多生成的章节配图数量。
      */
-    private final ImageRequirementPolicy imageRequirementPolicy;
+    private final int maxSectionImages;
 
     public ImageAnalyzerAgent(DashScopeApi dashScopeApi, OpenAiImageProperties imageProperties) {
         ChatModel chatModel = DashScopeChatModel.builder()
@@ -57,7 +57,7 @@ public class ImageAnalyzerAgent {
                         .build())
                 .build();
         this.chatClient = ChatClient.builder(chatModel).build();
-        this.imageRequirementPolicy = new ImageRequirementPolicy(imageProperties.getMaxSectionImages());
+        this.maxSectionImages = imageProperties.getMaxSectionImages();
     }
 
     /**
@@ -69,7 +69,7 @@ public class ImageAnalyzerAgent {
         log.info("阶段4：开始分析配图需求, taskId={}", state.getTaskId());
         String mainTitle = state.getTitle().getMainTitle();
         String content = state.getContent();
-        String prompt = buildPrompt(mainTitle, content);
+        String prompt = buildPrompt(mainTitle, content, state.getEnabledImageMethods());
 
         String response = chatClient.prompt()
                 .user(prompt)
@@ -78,7 +78,8 @@ public class ImageAnalyzerAgent {
 
         ArticleState.Agent4Result result = parseResult(response);
         List<ArticleState.ImageRequirement> imageRequirements =
-                imageRequirementPolicy.apply(result.getImageRequirements());
+                new ImageRequirementPolicy(maxSectionImages, state.getEnabledImageMethods())
+                        .apply(result.getImageRequirements());
 
         state.setContent(StrUtil.blankToDefault(result.getContentWithPlaceholders(), content));
         state.setImageRequirements(imageRequirements);
@@ -86,9 +87,9 @@ public class ImageAnalyzerAgent {
     }
 
     /**
-     * 构建配图分析提示词。第一阶段只允许 GPT_IMAGE，避免多策略分发提前复杂化。
+     * 构建配图分析提示词，要求模型在后端已支持的来源中选择最适合的配图方式。
      */
-    private String buildPrompt(String mainTitle, String content) {
+    private String buildPrompt(String mainTitle, String content, List<String> enabledImageMethods) {
         return """
                 你是一位专业的新媒体编辑，正在为文章生成配图需求。
 
@@ -107,30 +108,83 @@ public class ImageAnalyzerAgent {
                 1. 生成 1 张封面图，position 必须为 1，type 必须为 cover，placeholderId 留空。
                 2. 最多再生成 2 张章节配图，position 从 2 开始，type 使用 section。
                 3. 章节配图必须在 contentWithPlaceholders 中插入 {{IMAGE_PLACEHOLDER_N}} 占位符，且 placeholderId 必须完全一致。
-                4. 所有 imageSource 必须填写 GPT_IMAGE，禁止输出其他配图方式。
-                5. prompt 必须使用英文，适合直接交给 gpt-image-2 生成，避免水印、避免侵权角色、避免过多文字。
+                4. imageSource 必须从可用配图方式中选择，禁止输出 NANO_BANANA、PICSUM 或其他未列出的值。
+                5. GPT_IMAGE 的 prompt 必须使用英文，适合直接交给 gpt-image-2 生成，避免水印、避免侵权角色、避免过多文字。
                 6. contentWithPlaceholders 必须保留原正文内容，只添加图片占位符。
 
                 输出格式要求：
                 """
-                .formatted(mainTitle, content, buildAvailableMethodsDescription(), buildMethodUsageGuide())
+                .formatted(mainTitle, content,
+                        buildAvailableMethodsDescription(enabledImageMethods),
+                        buildMethodUsageGuide(enabledImageMethods))
                 + outputConverter.getFormat();
     }
 
     /**
-     * 返回当前阶段可用的唯一配图方式说明。
+     * 返回当前阶段可供模型选择的配图方式说明，PICSUM 只做系统降级不暴露给模型。
      */
-    private String buildAvailableMethodsDescription() {
-        return "- %s: 使用 OpenAI gpt-image-2 生成原创高质量文章配图".formatted(ImageMethodEnum.GPT_IMAGE.getValue());
+    private String buildAvailableMethodsDescription(List<String> enabledImageMethods) {
+        return resolveAllowedMethods(enabledImageMethods).stream()
+                .map(this::describeMethod)
+                .toList()
+                .stream()
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse(describeMethod(ImageMethodEnum.getDefaultAiMethod()));
     }
 
     /**
-     * 返回 GPT_IMAGE 的字段填写规则。
+     * 返回不同配图方式的字段填写规则，减少模型把 prompt/keywords 填反。
      */
-    private String buildMethodUsageGuide() {
-        return """
-                - GPT_IMAGE: 在 prompt 字段提供详细英文提示词，描述画面主体、风格、构图、色彩和用途；keywords 可留空。
-                """;
+    private String buildMethodUsageGuide(List<String> enabledImageMethods) {
+        return resolveAllowedMethods(enabledImageMethods).stream()
+                .map(this::describeUsage)
+                .toList()
+                .stream()
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse(describeUsage(ImageMethodEnum.getDefaultAiMethod()));
+    }
+
+    /**
+     * 解析用户允许的方式，空值默认开放所有非降级方式。
+     */
+    private List<ImageMethodEnum> resolveAllowedMethods(List<String> enabledImageMethods) {
+        if (enabledImageMethods == null || enabledImageMethods.isEmpty()) {
+            return ImageMethodEnum.userSelectableMethods();
+        }
+        List<ImageMethodEnum> methods = enabledImageMethods.stream()
+                .map(ImageMethodEnum::getByValue)
+                .filter(method -> method != null && !method.isFallback())
+                .distinct()
+                .toList();
+        return methods.isEmpty() ? List.of(ImageMethodEnum.getDefaultAiMethod()) : methods;
+    }
+
+    /**
+     * 生成单个配图方式的描述。
+     */
+    private String describeMethod(ImageMethodEnum method) {
+        return switch (method) {
+            case PEXELS -> "- PEXELS: 图库检索，适合真实场景、人物、办公、生活、产品氛围图。";
+            case MERMAID -> "- MERMAID: 流程图，适合步骤、流程、系统架构、因果关系，prompt 必须填写 Mermaid 代码。";
+            case ICONIFY -> "- ICONIFY: 图标，适合工具列表、概念标签、轻量点缀，keywords 填英文关键词。";
+            case SVG_DIAGRAM -> "- SVG_DIAGRAM: SVG 概念图，适合抽象概念、对比关系、知识结构图，prompt 填中文或英文需求。";
+            case GPT_IMAGE -> "- GPT_IMAGE: 原创 AI 生图，适合封面、复杂概念、没有现成素材的视觉表达。";
+            case PICSUM -> "";
+        };
+    }
+
+    /**
+     * 生成单个配图方式的字段填写规则。
+     */
+    private String describeUsage(ImageMethodEnum method) {
+        return switch (method) {
+            case PEXELS -> "- PEXELS: keywords 必填，使用 2-5 个英文检索词；prompt 可留空。";
+            case MERMAID -> "- MERMAID: prompt 必填，只填写 Mermaid 代码，例如 flowchart TD；keywords 填流程主题。";
+            case ICONIFY -> "- ICONIFY: keywords 必填，使用英文名词，例如 productivity、database、calendar；prompt 可留空。";
+            case SVG_DIAGRAM -> "- SVG_DIAGRAM: prompt 必填，描述概念图结构、节点、关系和视觉风格；keywords 可填主题词。";
+            case GPT_IMAGE -> "- GPT_IMAGE: prompt 必填，使用详细英文提示词，描述画面主体、风格、构图、色彩和用途；keywords 可留空。";
+            case PICSUM -> "";
+        };
     }
 
     /**

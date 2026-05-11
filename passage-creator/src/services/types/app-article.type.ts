@@ -5,6 +5,7 @@ import type { IPageResponse, IPaginationRequestQuery } from '@/services/types/re
  */
 export interface AppArticleCreateRequest {
   topic: string
+  enabledImageMethods?: string[]
 }
 
 /**
@@ -81,6 +82,7 @@ export interface AppArticleProgress {
   outline?: string
   content?: string
   fullContent?: string
+  enabledImageMethods?: string
   errorMessage?: string
   createTime?: string
   completedTime?: string

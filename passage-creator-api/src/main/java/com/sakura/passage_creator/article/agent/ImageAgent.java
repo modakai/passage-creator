@@ -1,40 +1,50 @@
-package com.sakura.passage_creator.article.image.service;
+package com.sakura.passage_creator.article.agent;
 
 import com.sakura.passage_creator.article.agent.state.ArticleState;
+import com.sakura.passage_creator.article.image.service.ArticleImageStorageService;
+import com.sakura.passage_creator.article.image.service.ImageGenerationResult;
+import com.sakura.passage_creator.article.image.service.ImageToolRegistry;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * 文章配图生成服务，负责按 imageSource 分发到不同策略并统一上传 OSS。
+ * 配图 Agent，负责按用户允许的配图方式分析需求，并调用对应工具完成配图。
  */
-@Service
+@Component
 @Slf4j
-public class ArticleImageGenerationService {
+public class ImageAgent {
 
-    private final Map<ImageMethodEnum, ImageGenerateStrategy> strategyMap = new EnumMap<>(ImageMethodEnum.class);
+    private final ImageAnalyzerAgent imageAnalyzerAgent;
+
+    private final ImageToolRegistry imageToolRegistry;
 
     private final ArticleImageStorageService imageStorageService;
 
-    public ArticleImageGenerationService(List<ImageGenerateStrategy> strategies,
+    public ImageAgent(ImageAnalyzerAgent imageAnalyzerAgent,
+            ImageToolRegistry imageToolRegistry,
             ArticleImageStorageService imageStorageService) {
+        this.imageAnalyzerAgent = imageAnalyzerAgent;
+        this.imageToolRegistry = imageToolRegistry;
         this.imageStorageService = imageStorageService;
-        for (ImageGenerateStrategy strategy : strategies) {
-            strategyMap.put(strategy.getMethod(), strategy);
-        }
     }
 
     /**
-     * 生成并上传所有配图。当前保持串行，便于定位第三方接口或 OSS 错误。
+     * 使用配图分析 Agent 生成配图计划，分析阶段会尊重 state.enabledImageMethods。
+     */
+    public void analyze(ArticleState state) {
+        imageAnalyzerAgent.analyze(state);
+    }
+
+    /**
+     * 根据配图需求调用对应工具，工具失败时允许系统级降级到 Picsum。
      *
-     * @param taskId              文章任务 id
-     * @param imageRequirements   配图需求列表
+     * @param taskId                文章任务 id
+     * @param imageRequirements     配图需求列表
      * @param imageCompleteConsumer 单张图片完成回调
      * @return 配图结果列表
      */
@@ -59,7 +69,7 @@ public class ArticleImageGenerationService {
     }
 
     /**
-     * 优先使用需求中的策略，失败时使用 Picsum 降级，保证正文合成不被单张图拖垮。
+     * 优先调用需求指定的工具，失败后降级到 Picsum，保证文章不会因单图失败而整体中断。
      */
     private ImageGenerationResult generateWithFallback(ArticleState.ImageRequirement requirement) {
         ImageMethodEnum method = resolveMethod(requirement);
@@ -67,30 +77,26 @@ public class ArticleImageGenerationService {
             return generateByMethod(method, requirement);
         }
         catch (RuntimeException e) {
-            log.warn("配图策略执行失败，尝试降级, method={}, position={}, reason={}",
+            log.warn("配图工具执行失败，尝试降级, method={}, position={}, reason={}",
                     method, requirement.getPosition(), e.getMessage());
-            log.debug("配图策略失败详情", e);
+            log.debug("配图工具失败详情", e);
             return generateByMethod(ImageMethodEnum.getFallbackMethod(), requirement);
         }
     }
 
     /**
-     * 根据指定策略生成图片，策略缺失或不可用时抛出异常交给上层降级。
+     * 调用指定工具并校验返回数据，防止无效图片进入 OSS 上传。
      */
     private ImageGenerationResult generateByMethod(ImageMethodEnum method, ArticleState.ImageRequirement requirement) {
-        ImageGenerateStrategy strategy = strategyMap.get(method);
-        if (strategy == null || !strategy.isAvailable()) {
-            throw new IllegalStateException("配图策略不可用: " + method.getValue());
-        }
-        ImageGenerationResult result = strategy.generate(requirement);
+        ImageGenerationResult result = imageToolRegistry.getRequiredTool(method).generate(requirement);
         if (result == null || result.getImageData() == null || !result.getImageData().isValid()) {
-            throw new IllegalStateException("配图策略返回无效图片数据: " + method.getValue());
+            throw new IllegalStateException("配图工具返回无效图片数据: " + method.getValue());
         }
         return result;
     }
 
     /**
-     * 解析需求中的图片来源，未知来源先回到 GPT_IMAGE。
+     * 解析需求中的图片来源，未知来源回到默认 AI 生图工具。
      */
     private ImageMethodEnum resolveMethod(ArticleState.ImageRequirement requirement) {
         ImageMethodEnum method = ImageMethodEnum.getByValue(requirement.getImageSource());
@@ -98,7 +104,7 @@ public class ArticleImageGenerationService {
     }
 
     /**
-     * 将配图需求和策略产出转换为可持久化的配图结果。
+     * 将工具结果转换为文章可持久化的配图结果。
      */
     private ArticleState.ImageResult buildImageResult(
             ArticleState.ImageRequirement requirement,
@@ -116,7 +122,7 @@ public class ArticleImageGenerationService {
     }
 
     /**
-     * 生成 Markdown alt 文本，优先使用章节标题。
+     * 生成 Markdown alt 文本，优先使用工具返回的描述。
      */
     private String resolveDescription(ArticleState.ImageRequirement requirement, ImageGenerationResult generationResult) {
         if (generationResult.getDescription() != null && !generationResult.getDescription().isBlank()) {

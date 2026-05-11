@@ -70,6 +70,11 @@ public class ArticleVO implements Serializable {
     private String images;
 
     /**
+     * 用户允许使用的配图方式 JSON 数组文本。
+     */
+    private String enabledImageMethods;
+
+    /**
      * 文章状态。
      */
     private String status;

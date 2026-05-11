@@ -255,7 +255,7 @@ public interface PromptConstant {
                   "position": 1,
                   "type": "cover",
                   "sectionTitle": "",
-                  "imageSource": "NANO_BANANA",
+                  "imageSource": "GPT_IMAGE",
                   "keywords": "",
                   "prompt": "A modern minimalist illustration of AI technology concept, featuring abstract neural network patterns with blue and purple gradient colors, clean design suitable for article cover, 16:9 aspect ratio",
                   "placeholderId": ""

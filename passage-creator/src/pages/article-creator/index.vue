@@ -34,6 +34,7 @@ import {
 import { connectArticleSse } from '@/utils/article-sse'
 
 type ArticleStyle = '默认' | '科技风格' | '情感风格' | '教育风格' | '轻松幽默'
+type ImageMethod = 'GPT_IMAGE' | 'PEXELS' | 'MERMAID' | 'ICONIFY' | 'SVG_DIAGRAM'
 
 const topic = ref('')
 const taskId = ref('')
@@ -42,6 +43,7 @@ const isCreating = ref(false)
 const isConnected = ref(false)
 const currentPhase = ref<ArticlePhase>('INPUT')
 const selectedStyle = ref<ArticleStyle>('默认')
+const selectedImageMethods = ref<ImageMethod[]>(['GPT_IMAGE'])
 const selectedTitleIndex = ref<number | null>(null)
 const userDescription = ref('')
 const outlineSections = ref<ArticleOutlineSection[]>([])
@@ -57,7 +59,7 @@ const steps = computed(() => [
   { title: '规划大纲', desc: '构建文章结构，理清脉络', active: ['OUTLINE_GENERATING', 'OUTLINE_EDITING'].includes(currentPhase.value) },
   { title: '撰写正文', desc: '流式生成高质量文章内容', active: currentPhase.value === 'CONTENT_GENERATING' },
   { title: '分析配图', desc: '分析封面和章节配图需求', active: currentPhase.value === 'IMAGE_ANALYZING' },
-  { title: '生成配图', desc: '使用 GPT Image 2 生成配图', active: currentPhase.value === 'IMAGE_GENERATING' },
+  { title: '生成配图', desc: '多策略生成并保存到 OSS', active: currentPhase.value === 'IMAGE_GENERATING' },
   { title: '图文合成', desc: '将图片插入正文并保存结果', active: ['CONTENT_MERGING', 'COMPLETED'].includes(currentPhase.value) },
 ])
 
@@ -77,10 +79,20 @@ const writingTips = [
 ]
 
 const styleOptions: ArticleStyle[] = ['默认', '科技风格', '情感风格', '教育风格', '轻松幽默']
-const imageOptions = ['GPT Image 2']
+const imageOptions: Array<{ label: string, value: ImageMethod }> = [
+  { label: 'GPT Image 2', value: 'GPT_IMAGE' },
+  { label: 'Pexels', value: 'PEXELS' },
+  { label: 'Mermaid', value: 'MERMAID' },
+  { label: 'Iconify', value: 'ICONIFY' },
+  { label: 'SVG 概念图', value: 'SVG_DIAGRAM' },
+]
 
 const topicLength = computed(() => topic.value.length)
-const canCreate = computed(() => topic.value.trim().length > 0 && !isCreating.value)
+const canCreate = computed(() =>
+  topic.value.trim().length > 0
+  && selectedImageMethods.value.length > 0
+  && !isCreating.value,
+)
 const isInputPhase = computed(() => currentPhase.value === 'INPUT' && !taskId.value)
 const isTitleGenerating = computed(() =>
   Boolean(taskId.value) && ['PENDING', 'TITLE_GENERATING'].includes(currentPhase.value),
@@ -337,7 +349,43 @@ function resetCreatorState() {
   isCreating.value = false
   isConfirmingTitle.value = false
   isConfirmingOutline.value = false
+  selectedImageMethods.value = ['GPT_IMAGE']
   currentPhase.value = 'INPUT'
+}
+
+/**
+ * 切换用户允许的配图方式，至少保留一种，避免后端无法规划配图。
+ */
+function toggleImageMethod(method: ImageMethod, checked: boolean | 'indeterminate') {
+  if (checked === true) {
+    if (!selectedImageMethods.value.includes(method)) {
+      selectedImageMethods.value.push(method)
+    }
+    return
+  }
+  if (selectedImageMethods.value.length <= 1) {
+    toast.error('至少保留一种配图方式')
+    return
+  }
+  selectedImageMethods.value = selectedImageMethods.value.filter(item => item !== method)
+}
+
+/**
+ * 判断当前配图方式是否是唯一已选方式，唯一项不允许取消。
+ */
+function isImageMethodLocked(method: ImageMethod) {
+  return selectedImageMethods.value.length <= 1 && selectedImageMethods.value.includes(method)
+}
+
+/**
+ * 点击整个选项块切换配图方式，避免 checkbox 文本标签无法触发状态更新。
+ */
+function handleImageMethodOptionClick(method: ImageMethod) {
+  if (isImageMethodLocked(method)) {
+    toast.error('至少保留一种配图方式')
+    return
+  }
+  toggleImageMethod(method, !selectedImageMethods.value.includes(method))
 }
 
 /**
@@ -458,7 +506,10 @@ async function handleCreateTask() {
   isCreating.value = true
 
   try {
-    const response = await createAppArticleTask({ topic: normalizedTopic })
+    const response = await createAppArticleTask({
+      topic: normalizedTopic,
+      enabledImageMethods: selectedImageMethods.value,
+    })
     connectTaskProgress(response.data)
   }
   catch (error: any) {
@@ -676,21 +727,29 @@ onMounted(() => {
                   <UiCardTitle class="text-base">
                     配图方式
                   </UiCardTitle>
-                  <UiCardDescription>当前固定使用 GPT Image 2，后续再开放多策略选择</UiCardDescription>
+                  <UiCardDescription>配图 Agent 会在已选方式内规划，失败时自动降级</UiCardDescription>
                 </UiCardHeader>
                 <UiCardContent>
                   <div class="flex flex-wrap gap-3">
-                    <UiField
+                    <button
                       v-for="item in imageOptions"
-                      :key="item"
-                      orientation="horizontal"
-                      class="w-auto items-center rounded-md border px-4 py-2.5"
+                      :key="item.value"
+                      type="button"
+                      class="flex w-auto items-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium transition-colors"
+                      :class="[
+                        selectedImageMethods.includes(item.value) ? 'border-emerald-500 bg-emerald-50' : 'bg-background hover:bg-muted/60',
+                        isImageMethodLocked(item.value) ? 'cursor-not-allowed opacity-80' : 'cursor-pointer',
+                      ]"
+                      @click="handleImageMethodOptionClick(item.value)"
                     >
-                      <UiCheckbox :id="`image-${item}`" :model-value="true" disabled />
-                      <UiFieldLabel :for="`image-${item}`" class="font-medium">
-                        {{ item }}
-                      </UiFieldLabel>
-                    </UiField>
+                      <UiCheckbox
+                        :id="`image-${item.value}`"
+                        class="pointer-events-none"
+                        :model-value="selectedImageMethods.includes(item.value)"
+                        :disabled="isImageMethodLocked(item.value)"
+                      />
+                      <span>{{ item.label }}</span>
+                    </button>
                   </div>
                 </UiCardContent>
               </UiCard>

@@ -12,6 +12,7 @@ import com.sakura.passage_creator.article.model.dto.ArticleQueryRequest;
 import com.sakura.passage_creator.article.model.dto.ArticleUpdateRequest;
 import com.sakura.passage_creator.article.model.entity.Article;
 import com.sakura.passage_creator.article.model.enums.ArticlePhaseEnum;
+import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
 import com.sakura.passage_creator.article.model.enums.ArticleStatusEnum;
 import com.sakura.passage_creator.article.model.vo.ArticleVO;
 import com.sakura.passage_creator.article.repository.ArticleMapper;
@@ -196,6 +197,11 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
 
     @Override
     public String createArticle(String topic, LoginUserInfo loginUser) {
+        return createArticle(topic, List.of(), loginUser);
+    }
+
+    @Override
+    public String createArticle(String topic, List<String> enabledImageMethods, LoginUserInfo loginUser) {
         assertLogin(loginUser);
         ThrowUtils.throwIf(StringUtils.isBlank(topic), ErrorCode.PARAMS_ERROR, "文章选题不能为空");
         ThrowUtils.throwIf(topic.length() > 500, ErrorCode.PARAMS_ERROR, "文章选题不能超过 500 个字符");
@@ -207,10 +213,32 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
         article.setTopic(topic);
         article.setStatus(ArticleStatusEnum.PENDING.getValue());
         article.setPhase(ArticlePhaseEnum.PENDING.getValue());
+        article.setEnabledImageMethods(JSONUtil.toJsonStr(normalizeEnabledImageMethods(enabledImageMethods)));
 
         save(article);
 
         return taskId;
+    }
+
+    /**
+     * 清洗客户端传入的配图方式，只保存后端支持且允许用户主动选择的方式。
+     */
+    private List<String> normalizeEnabledImageMethods(List<String> enabledImageMethods) {
+        if (enabledImageMethods == null || enabledImageMethods.isEmpty()) {
+            return ImageMethodEnum.userSelectableMethods().stream()
+                    .map(ImageMethodEnum::getValue)
+                    .toList();
+        }
+        List<String> normalized = enabledImageMethods.stream()
+                .map(ImageMethodEnum::getByValue)
+                .filter(method -> method != null && !method.isFallback())
+                .map(ImageMethodEnum::getValue)
+                .distinct()
+                .toList();
+        if (normalized.isEmpty()) {
+            return List.of(ImageMethodEnum.getDefaultAiMethod().getValue());
+        }
+        return normalized;
     }
 
     @Override
