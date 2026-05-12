@@ -1,6 +1,76 @@
 import type { IPaginationRequestQuery } from './response.type'
 
 /**
+ * 人工充值套餐。
+ */
+export interface ManualRechargePackage {
+  packageId: string
+  name: string
+  amount: number
+  credits: number
+  sortOrder?: number
+}
+
+/**
+ * 人工充值收款信息。
+ */
+export interface ManualRechargePayment {
+  wechatQrCodeUrl?: string
+  alipayQrCodeUrl?: string
+  paymentRemarkTip?: string
+  auditTip?: string
+}
+
+/**
+ * 人工充值申请。
+ */
+export interface ManualRechargeApplication {
+  id: string
+  rechargeNo: string
+  userId: string
+  packageId: string
+  amount: number
+  credits: number
+  payMethod: string
+  status: string
+  userRemark?: string
+  adminRemark?: string
+  auditTime?: string
+  auditor?: string
+  createTime?: string
+  updateTime?: string
+  payment?: ManualRechargePayment
+}
+
+/**
+ * 用户创建人工充值申请表单。
+ */
+export interface ManualRechargeCreateForm {
+  packageId: string
+  payMethod?: 'WECHAT' | 'ALIPAY' | 'UNKNOWN'
+  userRemark?: string
+}
+
+/**
+ * 人工充值申请分页查询参数。
+ */
+export interface ManualRechargeQuery extends IPaginationRequestQuery {
+  page: number
+  pageSize: number
+  userId?: string
+  status?: string
+  rechargeNo?: string
+}
+
+/**
+ * 管理员审核人工充值申请表单。
+ */
+export interface ManualRechargeReviewForm {
+  id: string
+  adminRemark?: string
+}
+
+/**
  * 用户积分账户概览。
  */
 export interface CreditSummary {
@@ -84,6 +154,18 @@ const CREDIT_TRANSACTION_STATUS_LABELS: Record<string, string> = {
   RELEASED: '已释放',
 }
 
+const MANUAL_RECHARGE_STATUS_LABELS: Record<string, string> = {
+  PENDING: '待审核',
+  APPROVED: '已到账',
+  REJECTED: '已拒绝',
+}
+
+const MANUAL_RECHARGE_PAY_METHOD_LABELS: Record<string, string> = {
+  WECHAT: '微信',
+  ALIPAY: '支付宝',
+  UNKNOWN: '未知',
+}
+
 /**
  * 将积分流水类型枚举转换为用户可理解的中文描述。
  */
@@ -96,4 +178,18 @@ export function getCreditTransactionTypeLabel(value?: string) {
  */
 export function getCreditTransactionStatusLabel(value?: string) {
   return value ? CREDIT_TRANSACTION_STATUS_LABELS[value] ?? value : '-'
+}
+
+/**
+ * 将人工充值申请状态转换为用户可理解的中文描述。
+ */
+export function getManualRechargeStatusLabel(value?: string) {
+  return value ? MANUAL_RECHARGE_STATUS_LABELS[value] ?? value : '-'
+}
+
+/**
+ * 将人工充值付款方式转换为用户可理解的中文描述。
+ */
+export function getManualRechargePayMethodLabel(value?: string) {
+  return value ? MANUAL_RECHARGE_PAY_METHOD_LABELS[value] ?? value : '-'
 }

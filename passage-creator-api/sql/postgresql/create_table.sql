@@ -310,6 +310,29 @@ create index if not exists idx_credit_tx_user_time on public.credit_transaction 
 create index if not exists idx_credit_tx_biz on public.credit_transaction (biz_type, biz_id);
 create index if not exists idx_credit_tx_status on public.credit_transaction (status);
 
+-- 人工扫码充值申请表。
+create table if not exists public.credit_recharge_application
+(
+    id           bigserial primary key,
+    recharge_no  varchar(64)                         not null,
+    user_id      bigint                              not null,
+    package_id   varchar(64)                         not null,
+    amount       numeric(18, 2) default 0.00         not null,
+    credits      numeric(18, 4) default 0.0000       not null,
+    pay_method   varchar(32)    default 'UNKNOWN'    not null,
+    status       varchar(32)    default 'PENDING'    not null,
+    user_remark  varchar(512),
+    admin_remark varchar(512),
+    audit_time   timestamp,
+    auditor      varchar(100),
+    create_time  timestamp      default current_timestamp not null,
+    update_time  timestamp      default current_timestamp not null,
+    is_delete    smallint       default 0            not null,
+    constraint uk_credit_recharge_no unique (recharge_no)
+);
+create index if not exists idx_credit_recharge_user_time on public.credit_recharge_application (user_id, create_time);
+create index if not exists idx_credit_recharge_status_time on public.credit_recharge_application (status, create_time);
+
 -- 审计日志表。
 create table if not exists public.sys_audit_log
 (

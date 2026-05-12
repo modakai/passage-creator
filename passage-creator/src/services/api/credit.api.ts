@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 
-import type { CreditAccountItem, CreditAccountQuery, CreditRechargeForm, CreditSummary, CreditTransactionItem, CreditTransactionQuery } from '@/services/types/credit.type'
+import type { CreditAccountItem, CreditAccountQuery, CreditRechargeForm, CreditSummary, CreditTransactionItem, CreditTransactionQuery, ManualRechargeApplication, ManualRechargeCreateForm, ManualRechargePackage, ManualRechargeQuery, ManualRechargeReviewForm } from '@/services/types/credit.type'
 import type { IPageResponse, IResponse } from '@/services/types/response.type'
 
 import { useApiFetch } from '@/composables/use-fetch'
@@ -52,6 +52,52 @@ export function useGetMyCreditTransactionsQuery(query: CreditTransactionQuery) {
 }
 
 /**
+ * 获取人工充值套餐。
+ */
+export function useGetManualRechargePackagesQuery() {
+  const { apiFetch } = useApiFetch()
+
+  return useQuery<IResponse<ManualRechargePackage[]>, Error>({
+    queryKey: ['manual-recharge-packages'],
+    queryFn: async () => await apiFetch<IResponse<ManualRechargePackage[]>>('/app/credit/recharge/packages'),
+  })
+}
+
+/**
+ * 获取当前用户人工充值申请。
+ */
+export function useGetMyManualRechargeApplicationsQuery(query: ManualRechargeQuery) {
+  const { apiFetch } = useApiFetch()
+
+  return useQuery<IResponse<IPageResponse<ManualRechargeApplication>>, Error>({
+    queryKey: computed(() => ['my-manual-recharge-applications', { ...query }]),
+    queryFn: async () => await apiFetch<IResponse<IPageResponse<ManualRechargeApplication>>>('/app/credit/recharge/applications/page', {
+      method: 'post',
+      body: normalizeCreditQuery(query),
+    }),
+  })
+}
+
+/**
+ * 创建人工充值申请。
+ */
+export function useCreateManualRechargeApplicationMutation() {
+  const { apiFetch } = useApiFetch()
+  const queryClient = useQueryClient()
+
+  return useMutation<IResponse<ManualRechargeApplication>, Error, ManualRechargeCreateForm>({
+    mutationKey: ['manual-recharge-create'],
+    mutationFn: async data => await apiFetch<IResponse<ManualRechargeApplication>>('/app/credit/recharge/applications', {
+      method: 'post',
+      body: data,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-manual-recharge-applications'] })
+    },
+  })
+}
+
+/**
  * 管理端获取全站积分流水。
  */
 export function useGetAdminCreditTransactionsQuery(query: CreditTransactionQuery) {
@@ -78,6 +124,62 @@ export function useGetAdminCreditAccountsQuery(query: CreditAccountQuery) {
       method: 'post',
       body: normalizeCreditQuery(query),
     }),
+  })
+}
+
+/**
+ * 管理端获取人工充值申请。
+ */
+export function useGetAdminManualRechargeApplicationsQuery(query: ManualRechargeQuery) {
+  const { apiFetch } = useApiFetch()
+
+  return useQuery<IResponse<IPageResponse<ManualRechargeApplication>>, Error>({
+    queryKey: computed(() => ['admin-manual-recharge-applications', { ...query }]),
+    queryFn: async () => await apiFetch<IResponse<IPageResponse<ManualRechargeApplication>>>('/credit/admin/recharge-applications/page', {
+      method: 'post',
+      body: normalizeCreditQuery(query),
+    }),
+  })
+}
+
+/**
+ * 管理员审核通过人工充值申请。
+ */
+export function useApproveManualRechargeApplicationMutation() {
+  const { apiFetch } = useApiFetch()
+  const queryClient = useQueryClient()
+
+  return useMutation<IResponse<ManualRechargeApplication>, Error, ManualRechargeReviewForm>({
+    mutationKey: ['admin-manual-recharge-approve'],
+    mutationFn: async data => await apiFetch<IResponse<ManualRechargeApplication>>('/credit/admin/recharge-applications/approve', {
+      method: 'post',
+      body: data,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-manual-recharge-applications'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-credit-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-credit-transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-summary'] })
+    },
+  })
+}
+
+/**
+ * 管理员拒绝人工充值申请。
+ */
+export function useRejectManualRechargeApplicationMutation() {
+  const { apiFetch } = useApiFetch()
+  const queryClient = useQueryClient()
+
+  return useMutation<IResponse<ManualRechargeApplication>, Error, ManualRechargeReviewForm>({
+    mutationKey: ['admin-manual-recharge-reject'],
+    mutationFn: async data => await apiFetch<IResponse<ManualRechargeApplication>>('/credit/admin/recharge-applications/reject', {
+      method: 'post',
+      body: data,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-manual-recharge-applications'] })
+    },
   })
 }
 

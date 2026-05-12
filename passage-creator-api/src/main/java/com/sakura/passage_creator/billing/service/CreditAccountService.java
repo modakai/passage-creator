@@ -3,6 +3,7 @@ package com.sakura.passage_creator.billing.service;
 import com.mybatisflex.core.service.IService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.sakura.passage_creator.billing.model.dto.CreditAccountQueryRequest;
+import com.sakura.passage_creator.billing.model.dto.CreditRechargeCommand;
 import com.sakura.passage_creator.billing.model.dto.CreditRechargeRequest;
 import com.sakura.passage_creator.billing.model.entity.CreditAccount;
 import com.sakura.passage_creator.billing.model.entity.CreditTransaction;
@@ -41,6 +42,11 @@ public interface CreditAccountService extends IService<CreditAccount> {
      * 管理员手动充值。
      */
     CreditTransaction recharge(CreditRechargeRequest request, String operator);
+
+    /**
+     * 内部业务充值，允许调用方指定业务类型和业务 id 以便账务追踪。
+     */
+    CreditTransaction recharge(CreditRechargeCommand command, String operator);
 
     /**
      * AI 调用前预扣积分。

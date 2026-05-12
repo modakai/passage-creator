@@ -4,6 +4,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.row.Db;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.sakura.passage_creator.billing.model.dto.CreditAccountQueryRequest;
+import com.sakura.passage_creator.billing.model.dto.CreditRechargeCommand;
 import com.sakura.passage_creator.billing.model.dto.CreditRechargeRequest;
 import com.sakura.passage_creator.billing.model.entity.CreditAccount;
 import com.sakura.passage_creator.billing.model.entity.CreditTransaction;
@@ -98,19 +99,32 @@ public class CreditAccountServiceImpl extends ServiceImpl<CreditAccountMapper, C
     @Override
     public CreditTransaction recharge(CreditRechargeRequest request, String operator) {
         ThrowUtils.throwIf(request == null || request.getUserId() == null, ErrorCode.PARAMS_ERROR);
-        BigDecimal amount = normalize(request.getAmount());
+        CreditRechargeCommand command = new CreditRechargeCommand();
+        command.setUserId(request.getUserId());
+        command.setAmount(request.getAmount());
+        command.setBizType("ADMIN_RECHARGE");
+        command.setBizId("manual:" + System.currentTimeMillis());
+        command.setDescription(StringUtils.defaultIfBlank(request.getDescription(), "管理员手动充值"));
+        return recharge(command, operator);
+    }
+
+    @Override
+    public CreditTransaction recharge(CreditRechargeCommand command, String operator) {
+        ThrowUtils.throwIf(command == null || command.getUserId() == null, ErrorCode.PARAMS_ERROR);
+        BigDecimal amount = normalize(command.getAmount());
         ThrowUtils.throwIf(amount.compareTo(BigDecimal.ZERO) <= 0, ErrorCode.PARAMS_ERROR, "充值积分必须大于 0");
         final CreditTransaction[] result = new CreditTransaction[1];
         Db.tx(() -> {
-            CreditAccount account = ensureAccount(request.getUserId());
+            CreditAccount account = ensureAccount(command.getUserId());
             account.setBalance(normalize(account.getBalance().add(amount)));
             account.setTotalRecharge(normalize(account.getTotalRecharge().add(amount)));
             account.setUpdateTime(LocalDateTime.now());
             this.updateById(account);
             result[0] = saveTransaction(account, CreditTransactionTypeEnum.RECHARGE.getValue(),
-                    CreditTransactionStatusEnum.COMPLETED.getValue(), amount, account.getBalance(), "ADMIN_RECHARGE",
-                    "manual:" + System.currentTimeMillis(),
-                    StringUtils.defaultIfBlank(request.getDescription(), "管理员手动充值"), operator);
+                    CreditTransactionStatusEnum.COMPLETED.getValue(), amount, account.getBalance(),
+                    StringUtils.defaultIfBlank(command.getBizType(), "ADMIN_RECHARGE"),
+                    StringUtils.defaultIfBlank(command.getBizId(), "manual:" + System.currentTimeMillis()),
+                    StringUtils.defaultIfBlank(command.getDescription(), "管理员手动充值"), operator);
             return true;
         });
         return result[0];

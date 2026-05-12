@@ -313,6 +313,29 @@ create table if not exists credit_transaction
     key idx_credit_tx_status (status)
 ) comment '用户积分流水表' collate = utf8mb4_unicode_ci;
 
+-- 人工扫码充值申请表
+create table if not exists credit_recharge_application
+(
+    id           bigint auto_increment comment 'id' primary key,
+    recharge_no  varchar(64)                            not null comment '充值申请号',
+    user_id      bigint                                 not null comment '用户 ID',
+    package_id   varchar(64)                            not null comment '套餐 ID',
+    amount       decimal(18, 2) default 0.00            not null comment '支付金额',
+    credits      decimal(18, 4) default 0.0000          not null comment '应发积分',
+    pay_method   varchar(32)  default 'UNKNOWN'         not null comment '支付方式：WECHAT/ALIPAY/UNKNOWN',
+    status       varchar(32)  default 'PENDING'         not null comment '申请状态：PENDING/APPROVED/REJECTED',
+    user_remark  varchar(512)                           null comment '用户备注',
+    admin_remark varchar(512)                           null comment '管理员审核备注',
+    audit_time   datetime                               null comment '审核时间',
+    auditor      varchar(100)                           null comment '审核人',
+    create_time  datetime     default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time  datetime     default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    is_delete    tinyint      default 0                 not null comment '是否删除',
+    unique key uk_credit_recharge_no (recharge_no),
+    key idx_credit_recharge_user_time (user_id, create_time),
+    key idx_credit_recharge_status_time (status, create_time)
+) comment '人工扫码充值申请表' collate = utf8mb4_unicode_ci;
+
 -- 审计日志表
 create table if not exists sys_audit_log
 (

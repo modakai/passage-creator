@@ -4,18 +4,24 @@ import com.mybatisflex.core.paginate.Page;
 import com.sakura.passage_creator.billing.model.dto.CreditAccountQueryRequest;
 import com.sakura.passage_creator.billing.model.dto.CreditRechargeRequest;
 import com.sakura.passage_creator.billing.model.dto.CreditTransactionQueryRequest;
+import com.sakura.passage_creator.billing.model.dto.ManualRechargeQueryRequest;
+import com.sakura.passage_creator.billing.model.dto.ManualRechargeReviewRequest;
 import com.sakura.passage_creator.billing.model.entity.CreditAccount;
 import com.sakura.passage_creator.billing.model.entity.CreditTransaction;
 import com.sakura.passage_creator.billing.model.vo.CreditAccountVO;
 import com.sakura.passage_creator.billing.model.vo.CreditTransactionVO;
+import com.sakura.passage_creator.billing.model.vo.ManualRechargeApplicationVO;
 import com.sakura.passage_creator.billing.service.CreditAccountService;
 import com.sakura.passage_creator.billing.service.CreditTransactionService;
+import com.sakura.passage_creator.billing.service.ManualRechargeApplicationService;
+import com.sakura.passage_creator.shared.annotation.AuditLogRecord;
 import com.sakura.passage_creator.shared.annotation.AuthCheck;
 import com.sakura.passage_creator.shared.common.BaseResponse;
 import com.sakura.passage_creator.shared.common.ResultUtils;
 import com.sakura.passage_creator.shared.constant.UserConstant;
 import com.sakura.passage_creator.shared.context.LoginUserContext;
 import com.sakura.passage_creator.shared.context.LoginUserInfo;
+import com.sakura.passage_creator.shared.enums.AuditOperationTypeEnum;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,10 +41,14 @@ public class CreditAdminController {
 
     private final CreditTransactionService transactionService;
 
+    private final ManualRechargeApplicationService manualRechargeApplicationService;
+
     public CreditAdminController(CreditAccountService creditAccountService,
-            CreditTransactionService transactionService) {
+            CreditTransactionService transactionService,
+            ManualRechargeApplicationService manualRechargeApplicationService) {
         this.creditAccountService = creditAccountService;
         this.transactionService = transactionService;
+        this.manualRechargeApplicationService = manualRechargeApplicationService;
     }
 
     /**
@@ -79,6 +89,38 @@ public class CreditAdminController {
         Page<CreditTransactionVO> voPage = new Page<>(page.getPageNumber(), page.getPageSize(), page.getTotalRow());
         voPage.setRecords(voList);
         return ResultUtils.success(voPage);
+    }
+
+    /**
+     * 管理端分页查看人工充值申请。
+     */
+    @PostMapping("/recharge-applications/page")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Page<ManualRechargeApplicationVO>> listRechargeApplicationsByPage(
+            @Valid @RequestBody ManualRechargeQueryRequest request) {
+        return ResultUtils.success(manualRechargeApplicationService.pageAdminApplications(request));
+    }
+
+    /**
+     * 管理员审核通过人工充值申请。
+     */
+    @PostMapping("/recharge-applications/approve")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @AuditLogRecord(description = "审核通过人工充值申请", module = "积分管理", operationType = AuditOperationTypeEnum.UPDATE)
+    public BaseResponse<ManualRechargeApplicationVO> approveRechargeApplication(
+            @Valid @RequestBody ManualRechargeReviewRequest request) {
+        return ResultUtils.success(manualRechargeApplicationService.approve(request, resolveOperator()));
+    }
+
+    /**
+     * 管理员拒绝人工充值申请。
+     */
+    @PostMapping("/recharge-applications/reject")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @AuditLogRecord(description = "拒绝人工充值申请", module = "积分管理", operationType = AuditOperationTypeEnum.UPDATE)
+    public BaseResponse<ManualRechargeApplicationVO> rejectRechargeApplication(
+            @Valid @RequestBody ManualRechargeReviewRequest request) {
+        return ResultUtils.success(manualRechargeApplicationService.reject(request, resolveOperator()));
     }
 
     private String resolveOperator() {

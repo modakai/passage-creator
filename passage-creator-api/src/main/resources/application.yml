@@ -128,6 +128,32 @@ mermaid:
   base-url: ${MERMAID_RENDER_BASE_URL:https://kroki.io}
   output-format: ${MERMAID_OUTPUT_FORMAT:png}
 
+# 人工扫码充值配置。仅用于内测人工审核，不接入第三方支付。
+billing:
+  manual-recharge:
+    enabled: true
+    wechat-qr-code-url: ${MANUAL_RECHARGE_WECHAT_QR:/api/manual-recharge/wechat-qr.svg}
+    alipay-qr-code-url: ${MANUAL_RECHARGE_ALIPAY_QR:/api/manual-recharge/alipay-qr.svg}
+    packages:
+      - package-id: beta-10
+        name: 10 元套餐
+        amount: 10.00
+        credits: 100.0000
+        enabled: true
+        sort-order: 10
+      - package-id: beta-30
+        name: 30 元套餐
+        amount: 30.00
+        credits: 350.0000
+        enabled: true
+        sort-order: 20
+      - package-id: beta-50
+        name: 50 元套餐
+        amount: 50.00
+        credits: 650.0000
+        enabled: true
+        sort-order: 30
+
 # 对象存储
 oss:
   enable: true
