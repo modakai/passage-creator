@@ -33,6 +33,19 @@ export interface ArticleOutlineResult {
 }
 
 /**
+ * 文章配图生成结果，position=1 约定为封面图。
+ */
+export interface ArticleImageResult {
+  position?: number
+  url?: string
+  method?: string
+  keywords?: string
+  sectionTitle?: string
+  description?: string
+  placeholderId?: string
+}
+
+/**
  * 确认标题并进入大纲生成阶段的请求。
  */
 export interface AppArticleConfirmTitleRequest {
@@ -82,6 +95,8 @@ export interface AppArticleProgress {
   outline?: string
   content?: string
   fullContent?: string
+  coverImage?: string
+  images?: string
   enabledImageMethods?: string
   errorMessage?: string
   createTime?: string

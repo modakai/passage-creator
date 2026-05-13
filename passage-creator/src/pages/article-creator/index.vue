@@ -18,6 +18,7 @@ import { toast } from 'vue-sonner'
 
 import type {
   AppArticleProgress,
+  ArticleImageResult,
   ArticleOutlineResult,
   ArticleOutlineSection,
   ArticlePhase,
@@ -48,14 +49,25 @@ const selectedImageMethods = ref<ImageMethod[]>(['GPT_IMAGE'])
 const selectedTitleIndex = ref<number | null>(null)
 const userDescription = ref('')
 const outlineSections = ref<ArticleOutlineSection[]>([])
+const generatedImages = ref<ArticleImageResult[]>([])
+const coverImage = ref('')
 const generatedContent = ref('')
 const isConfirmingTitle = ref(false)
 const isConfirmingOutline = ref(false)
 let closeSse: (() => void) | null = null
+const route = useRoute()
+const router = useRouter()
 
 const { data: creditSummaryData, isFetching: isFetchingCreditSummary } = useGetCreditSummaryQuery()
 
 const maxTopicLength = 500
+const activeArticleTaskStorageKey = 'sakura_article_creator_active_task'
+const activeArticleTaskTtlMs = 7 * 24 * 60 * 60 * 1000
+
+interface ActiveArticleTaskCache {
+  taskId: string
+  savedAt: number
+}
 
 const steps = computed(() => [
   { title: '生成标题', desc: 'AI 分析选题，生成吸睛标题', active: ['INPUT', 'PENDING', 'TITLE_GENERATING', 'TITLE_SELECTING'].includes(currentPhase.value) },
@@ -130,6 +142,9 @@ const selectedTitle = computed(() => {
 const outlineSectionCount = computed(() => outlineSections.value.length)
 const outlinePointCount = computed(() =>
   outlineSections.value.reduce((total, section) => total + section.points.length, 0),
+)
+const coverImageAlt = computed(() =>
+  generatedImages.value.find(image => image.position === 1)?.description || '文章封面图',
 )
 const generatedContentLength = computed(() => generatedContent.value.length)
 const creditSummary = computed(() => creditSummaryData.value?.data)
@@ -303,6 +318,30 @@ function parseTitleOptions(value?: string) {
 }
 
 /**
+ * 解析后端保存的配图结果，封面图和章节图共用这一份 JSON 数组。
+ */
+function parseImageResults(value?: string) {
+  if (!value) {
+    return []
+  }
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed as ArticleImageResult[] : []
+  }
+  catch {
+    return []
+  }
+}
+
+/**
+ * 从配图结果中同步封面，position=1 是后端约定的封面图。
+ */
+function applyImageResults(images: ArticleImageResult[]) {
+  generatedImages.value = images
+  coverImage.value = images.find(image => image.position === 1)?.url ?? coverImage.value
+}
+
+/**
  * 使用进度快照恢复当前页面状态，支持刷新页面或重新连接 SSE。
  */
 function applyProgress(progress: AppArticleProgress) {
@@ -310,6 +349,7 @@ function applyProgress(progress: AppArticleProgress) {
   taskId.value = progress.taskId
   topic.value = progress.topic
   generatedContent.value = progress.fullContent ?? progress.content ?? generatedContent.value
+  coverImage.value = progress.coverImage ?? coverImage.value
   const options = parseTitleOptions(progress.titleOptions)
   if (options.length > 0) {
     titleOptions.value = options
@@ -318,13 +358,103 @@ function applyProgress(progress: AppArticleProgress) {
   if (outline) {
     applyOutlineResult(outline)
   }
+  const images = parseImageResults(progress.images)
+  if (images.length > 0) {
+    applyImageResults(images)
+  }
   isCreating.value = ['PENDING', 'TITLE_GENERATING'].includes(progress.phase ?? 'PENDING')
+}
+
+/**
+ * 读取上次未完成创作任务，7 天外的任务交给后端过期策略处理，前端直接回到新建页。
+ */
+function readActiveArticleTaskId() {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  try {
+    const rawCache = window.localStorage.getItem(activeArticleTaskStorageKey)
+    if (!rawCache) {
+      return ''
+    }
+
+    const cache = JSON.parse(rawCache) as ActiveArticleTaskCache
+    const isValidTaskId = typeof cache.taskId === 'string' && cache.taskId.trim().length > 0
+    const isExpired = Date.now() - Number(cache.savedAt ?? 0) > activeArticleTaskTtlMs
+    if (!isValidTaskId || isExpired) {
+      window.localStorage.removeItem(activeArticleTaskStorageKey)
+      return ''
+    }
+    return cache.taskId
+  }
+  catch {
+    window.localStorage.removeItem(activeArticleTaskStorageKey)
+    return ''
+  }
+}
+
+/**
+ * 记录当前未完成任务，用户刷新或重新进入创作页时可以重新连接 SSE。
+ */
+function rememberActiveArticleTask(nextTaskId: string) {
+  if (typeof window === 'undefined' || !nextTaskId) {
+    return
+  }
+
+  window.localStorage.setItem(activeArticleTaskStorageKey, JSON.stringify({
+    taskId: nextTaskId,
+    savedAt: Date.now(),
+  } satisfies ActiveArticleTaskCache))
+}
+
+/**
+ * 任务完成、失败或用户重新开始时清除恢复入口，避免旧任务反复抢占新建页面。
+ */
+function forgetActiveArticleTask() {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.localStorage.removeItem(activeArticleTaskStorageKey)
+}
+
+/**
+ * 将 taskId 同步到 URL，浏览器刷新时不依赖内存状态也能恢复到人工确认节点。
+ */
+function syncTaskIdToRouteQuery(nextTaskId: string) {
+  if (route.query.taskId === nextTaskId) {
+    return
+  }
+
+  void router.replace({
+    path: route.path,
+    query: {
+      ...route.query,
+      taskId: nextTaskId,
+    },
+  })
+}
+
+/**
+ * 清理 URL 中的 taskId，确保后续打开创作页默认展示重新生成界面。
+ */
+function clearTaskIdRouteQuery() {
+  if (!route.query.taskId) {
+    return
+  }
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.taskId
+  void router.replace({
+    path: route.path,
+    query: nextQuery,
+  })
 }
 
 /**
  * 首页带入选题时，直接填充到第一步输入框。
  */
-const route = useRoute()
 const initialTopic = route.query.topic
 if (typeof initialTopic === 'string') {
   topic.value = initialTopic.slice(0, maxTopicLength)
@@ -345,10 +475,14 @@ function closeCurrentSse() {
  */
 function resetCreatorState() {
   closeCurrentSse()
+  forgetActiveArticleTask()
+  clearTaskIdRouteQuery()
   taskId.value = ''
   titleOptions.value = []
   selectedTitleIndex.value = null
   outlineSections.value = []
+  generatedImages.value = []
+  coverImage.value = ''
   generatedContent.value = ''
   isCreating.value = false
   isConfirmingTitle.value = false
@@ -423,6 +557,7 @@ function handleArticleSseMessage(message: ArticleSseMessage) {
     currentPhase.value = 'COMPLETED'
     isConfirmingOutline.value = false
     isConnected.value = false
+    forgetActiveArticleTask()
     toast.success('正文已生成')
   }
 
@@ -431,6 +566,7 @@ function handleArticleSseMessage(message: ArticleSseMessage) {
   }
 
   if (message.type === 'IMAGE_GENERATED') {
+    applyImageResults((message.data ?? []) as ArticleImageResult[])
     currentPhase.value = 'CONTENT_MERGING'
   }
 
@@ -444,6 +580,7 @@ function handleArticleSseMessage(message: ArticleSseMessage) {
     isConfirmingTitle.value = false
     isConfirmingOutline.value = false
     isConnected.value = false
+    forgetActiveArticleTask()
     toast.error(String(message.data ?? message.message ?? '文章生成失败'))
   }
 }
@@ -455,6 +592,8 @@ function connectTaskProgress(nextTaskId: string) {
   closeCurrentSse()
   taskId.value = nextTaskId
   isConnected.value = true
+  rememberActiveArticleTask(nextTaskId)
+  syncTaskIdToRouteQuery(nextTaskId)
 
   closeSse = connectArticleSse(nextTaskId, {
     onMessage: handleArticleSseMessage,
@@ -512,6 +651,8 @@ async function handleCreateTask() {
   titleOptions.value = []
   selectedTitleIndex.value = null
   outlineSections.value = []
+  generatedImages.value = []
+  coverImage.value = ''
   generatedContent.value = ''
   currentPhase.value = 'TITLE_GENERATING'
   isCreating.value = true
@@ -608,11 +749,13 @@ onUnmounted(() => {
 })
 
 onMounted(() => {
-  if (!initialTaskId) {
+  // 首页带 topic 进入时优先展示新建表单，避免本地缓存覆盖用户这次的新选题。
+  const resumeTaskId = initialTaskId || (typeof initialTopic === 'string' ? '' : readActiveArticleTaskId())
+  if (!resumeTaskId) {
     return
   }
   currentPhase.value = 'PENDING'
-  connectTaskProgress(initialTaskId)
+  connectTaskProgress(resumeTaskId)
 })
 </script>
 
@@ -1112,6 +1255,19 @@ onMounted(() => {
             </UiCardHeader>
 
             <UiCardContent class="space-y-4">
+              <div v-if="coverImage" class="overflow-hidden rounded-2xl border bg-white shadow-sm">
+                <img
+                  :src="coverImage"
+                  :alt="coverImageAlt"
+                  class="aspect-[16/9] w-full object-cover"
+                >
+                <div class="border-t px-4 py-3">
+                  <div class="text-sm font-medium">
+                    封面图
+                  </div>
+                </div>
+              </div>
+
               <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-900">
                 <span>富文本预览已按标题、段落、列表和代码块排版。</span>
                 <UiBadge variant="secondary">

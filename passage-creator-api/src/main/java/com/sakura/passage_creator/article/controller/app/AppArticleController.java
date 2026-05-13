@@ -11,15 +11,19 @@ import com.sakura.passage_creator.article.model.dto.SseMessage;
 import com.sakura.passage_creator.article.model.entity.Article;
 import com.sakura.passage_creator.article.model.enums.SseMessageTypeEnum;
 import com.sakura.passage_creator.article.model.vo.ArticleVO;
-import com.sakura.passage_creator.article.service.ArticleAsyncService;
 import com.sakura.passage_creator.article.service.ArticleService;
+import com.sakura.passage_creator.article.workflow.ArticleWorkflowNodeType;
+import com.sakura.passage_creator.article.workflow.ArticleWorkflowFacade;
+import com.sakura.passage_creator.creation.workflow.WorkflowEvent;
+import com.sakura.passage_creator.creation.workflow.WorkflowHumanTask;
+import com.sakura.passage_creator.creation.workflow.enums.WorkflowEventTypeEnum;
+import com.sakura.passage_creator.creation.workflow.service.WorkflowHumanTaskService;
 import com.sakura.passage_creator.shared.common.BaseResponse;
 import com.sakura.passage_creator.shared.common.ErrorCode;
 import com.sakura.passage_creator.shared.common.ResultUtils;
 import com.sakura.passage_creator.shared.context.LoginUserContext;
 import com.sakura.passage_creator.shared.context.LoginUserInfo;
 import com.sakura.passage_creator.shared.exception.ThrowUtils;
-import io.github.linpeilie.Converter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +38,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * 用户端 文章接口
@@ -47,13 +54,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AppArticleController {
 
-    private final ArticleAsyncService articleAsyncService;
+    private final ArticleWorkflowFacade articleWorkflowFacade;
 
     private final ArticleService articleService;
 
     private final SseEmitterManager sseEmitterManager;
 
-    private final Converter converter;
+    private final WorkflowHumanTaskService workflowHumanTaskService;
 
     /**
      * 创建文章任务，启动标题生成异步任务，返回 taskId
@@ -63,11 +70,8 @@ public class AppArticleController {
 
         LoginUserInfo loginUser = LoginUserContext.getLoginUser();
 
-        // 创建文章
-        String taskId = articleService.createArticle(request.getTopic(), request.getEnabledImageMethods(), loginUser);
-
-        // 异步构建
-        articleAsyncService.executePhase1(taskId, request.getTopic());
+        // 创建文章 workflow，标题生成由 workflow 异步推进。
+        String taskId = articleWorkflowFacade.createArticleWorkflow(request, loginUser);
 
         return ResultUtils.success(taskId);
     }
@@ -105,22 +109,8 @@ public class AppArticleController {
      */
     @PostMapping("/confirm-title")
     public BaseResponse<Boolean> confirmTitle(@Valid @RequestBody ArticleConfirmTitleRequest request) {
-        // 确认标题入库
-        Article article = converter.convert(request, Article.class);
-        // DTO 使用 selected* 表达前端选择结果，这里显式映射到文章实体标题字段。
-        article.setMainTitle(request.getSelectedMainTitle());
-        article.setSubTitle(request.getSelectedSubTitle());
         LoginUserInfo loginUser = LoginUserContext.getLoginUser();
-        Long userId = loginUser.userId();
-        article.setUserId(userId);
-        boolean flag = articleService.confirmTitle(article);
-        if (!flag) return ResultUtils.success(false);
-
-        // 异步生成大纲
-        articleAsyncService.executePhase2(article.getTaskId(), article.getMainTitle(),
-                article.getSubTitle(), article.getUserDescription());
-
-        return ResultUtils.success(true);
+        return ResultUtils.success(articleWorkflowFacade.confirmTitle(request, loginUser));
     }
 
     /**
@@ -128,15 +118,8 @@ public class AppArticleController {
      */
     @PostMapping("/confirm-outline")
     public BaseResponse<Boolean> confirmOutline(@Valid @RequestBody ArticleConfirmOutlineRequest request) {
-
-        boolean flag = articleService.confirmOutline(request.getTaskId(), request.getOutline());
-
-        if (!flag) return ResultUtils.success(flag);
-
-        // 生成正文
-        articleAsyncService.executePhase3(request.getTaskId(), request.getOutline());
-
-        return ResultUtils.success(true);
+        LoginUserInfo loginUser = LoginUserContext.getLoginUser();
+        return ResultUtils.success(articleWorkflowFacade.confirmOutline(request, loginUser));
     }
 
     /**
@@ -166,6 +149,42 @@ public class AppArticleController {
         ArticleVO articleVO = articleService.getArticleVO(article);
         SseMessage<ArticleVO> message = SseMessage.of(SseMessageTypeEnum.PROGRESS, articleVO);
         sseEmitterManager.send(taskId, JSONUtil.toJsonStr(message));
+        // 恢复 Human-in-the-Loop 等待态，避免刷新页面后只看到文章快照而缺少确认表单。
+        sendPendingHumanTaskIfPresent(taskId);
         return emitter;
+    }
+
+    /**
+     * SSE 重连时补发当前等待中的人工任务。
+     */
+    private void sendPendingHumanTaskIfPresent(String taskId) {
+        findPendingHumanTask(taskId).ifPresent(task -> {
+            WorkflowEvent event = WorkflowEvent.builder()
+                    .type(WorkflowEventTypeEnum.NODE_WAITING_USER.getValue())
+                    .taskId(taskId)
+                    .bizType(task.getBizType())
+                    .nodeType(task.getNodeType())
+                    .payload(Map.of(
+                            "humanTaskId", task.getId(),
+                            "formSchema", JSONUtil.parseObj(StringUtils.defaultIfBlank(task.getFormSchemaJson(), "{}")),
+                            "inputSnapshot", JSONUtil.parseObj(StringUtils.defaultIfBlank(task.getInputSnapshotJson(), "{}")),
+                            "version", task.getVersion()
+                    ))
+                    .eventTime(LocalDateTime.now())
+                    .build();
+            sseEmitterManager.send(taskId, JSONUtil.toJsonStr(event));
+        });
+    }
+
+    /**
+     * 查询文章 workflow 当前可能等待的人工任务。
+     */
+    private Optional<WorkflowHumanTask> findPendingHumanTask(String taskId) {
+        Optional<WorkflowHumanTask> titleTask = workflowHumanTaskService.getLatestWaitingTask(
+                taskId, ArticleWorkflowNodeType.TITLE_CONFIRM.getValue());
+        if (titleTask.isPresent()) {
+            return titleTask;
+        }
+        return workflowHumanTaskService.getLatestWaitingTask(taskId, ArticleWorkflowNodeType.OUTLINE_CONFIRM.getValue());
     }
 }

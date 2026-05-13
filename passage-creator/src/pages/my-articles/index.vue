@@ -302,4 +302,5 @@ function continueCreation(article: AppArticleItem) {
 meta:
   layout: user
   auth: true
+  section: user
 </route>
