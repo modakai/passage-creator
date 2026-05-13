@@ -3,6 +3,7 @@ import {
   CheckCircle2Icon,
   ClipboardCheckIcon,
   ClipboardIcon,
+  DownloadIcon,
   FileTextIcon,
   LightbulbIcon,
   LoaderCircleIcon,
@@ -31,6 +32,7 @@ import {
   confirmAppArticleOutline,
   confirmAppArticleTitle,
   createAppArticleTask,
+  downloadAppArticleImage,
 } from '@/services/api/app-article.api'
 import { useGetCreditSummaryQuery } from '@/services/api/credit.api'
 import { connectArticleSse } from '@/utils/article-sse'
@@ -143,6 +145,22 @@ const outlineSectionCount = computed(() => outlineSections.value.length)
 const outlinePointCount = computed(() =>
   outlineSections.value.reduce((total, section) => total + section.points.length, 0),
 )
+const downloadableImages = computed(() => {
+  const imageMap = new Map<string, ArticleImageResult>()
+  for (const image of generatedImages.value) {
+    if (image.url) {
+      imageMap.set(image.url, image)
+    }
+  }
+  if (coverImage.value && !imageMap.has(coverImage.value)) {
+    imageMap.set(coverImage.value, {
+      position: 1,
+      url: coverImage.value,
+      description: '文章封面图',
+    })
+  }
+  return Array.from(imageMap.values()).sort((left, right) => (left.position ?? 999) - (right.position ?? 999))
+})
 const coverImageAlt = computed(() =>
   generatedImages.value.find(image => image.position === 1)?.description || '文章封面图',
 )
@@ -628,6 +646,86 @@ async function handleCopyGeneratedContent() {
   }
   await copyGeneratedContent()
   toast.success('正文 Markdown 已复制')
+}
+
+/**
+ * 从图片 URL 中推断扩展名，无法识别时回退到 png。
+ */
+function resolveImageExtension(url: string, contentType?: string | null) {
+  if (contentType?.includes('jpeg') || contentType?.includes('jpg')) {
+    return 'jpg'
+  }
+  if (contentType?.includes('webp')) {
+    return 'webp'
+  }
+  if (contentType?.includes('gif')) {
+    return 'gif'
+  }
+  if (contentType?.includes('svg')) {
+    return 'svg'
+  }
+
+  try {
+    const pathname = new URL(url).pathname
+    const matched = pathname.match(/\.([a-zA-Z0-9]+)$/)
+    return matched?.[1]?.toLowerCase() || 'png'
+  }
+  catch {
+    return 'png'
+  }
+}
+
+/**
+ * 生成稳定的下载文件名，避免不同图片保存到本地后互相覆盖。
+ */
+function buildImageFileName(image: ArticleImageResult, index: number, extension: string) {
+  const imageLabel = image.position === 1 ? 'cover' : `image-${image.position ?? index + 1}`
+  return `article-${taskId.value || 'draft'}-${imageLabel}.${extension}`
+}
+
+/**
+ * 下载单张图片；如果 OSS 跨域限制阻止 fetch，则打开原图地址让浏览器处理保存。
+ */
+async function downloadImage(image: ArticleImageResult, index: number) {
+  if (!image.url) {
+    toast.error('图片地址不存在')
+    return
+  }
+  if (!taskId.value) {
+    toast.error('任务 ID 缺失，无法下载图片')
+    return
+  }
+
+  try {
+    const blob = await downloadAppArticleImage(taskId.value, image.url)
+    const extension = resolveImageExtension(image.url, blob.type)
+    const objectUrl = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = buildImageFileName(image, index, extension)
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(objectUrl)
+  }
+  catch {
+    window.open(image.url, '_blank', 'noopener,noreferrer')
+    toast.info('浏览器已打开原图，请在新页面保存图片')
+  }
+}
+
+/**
+ * 顺序下载所有已生成图片，避免同时触发多个下载被浏览器拦截。
+ */
+async function handleDownloadAllImages() {
+  if (downloadableImages.value.length === 0) {
+    toast.error('暂无可下载图片')
+    return
+  }
+
+  for (const [index, image] of downloadableImages.value.entries()) {
+    await downloadImage(image, index)
+  }
 }
 
 /**
@@ -1251,6 +1349,15 @@ onMounted(() => {
                   <ClipboardIcon v-else class="mr-2 size-4" />
                   {{ isGeneratedContentCopied ? '已复制' : '复制正文' }}
                 </UiButton>
+                <UiButton
+                  variant="outline"
+                  size="sm"
+                  :disabled="downloadableImages.length === 0"
+                  @click="handleDownloadAllImages"
+                >
+                  <DownloadIcon class="mr-2 size-4" />
+                  下载全部图片
+                </UiButton>
               </div>
             </UiCardHeader>
 
@@ -1262,8 +1369,18 @@ onMounted(() => {
                   class="aspect-[16/9] w-full object-cover"
                 >
                 <div class="border-t px-4 py-3">
-                  <div class="text-sm font-medium">
-                    封面图
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="text-sm font-medium">
+                      封面图
+                    </div>
+                    <UiButton
+                      variant="ghost"
+                      size="sm"
+                      @click="downloadImage(downloadableImages.find(image => image.position === 1) ?? { position: 1, url: coverImage, description: coverImageAlt }, 0)"
+                    >
+                      <DownloadIcon class="mr-2 size-4" />
+                      下载封面
+                    </UiButton>
                   </div>
                 </div>
               </div>
