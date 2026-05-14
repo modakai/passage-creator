@@ -34,6 +34,7 @@ public class WorkflowHumanTaskService {
                 .assigneeUserId(command.getAssigneeUserId())
                 .inputSnapshotJson(command.getInputSnapshotJson())
                 .formSchemaJson(command.getFormSchemaJson())
+                .expireTime(command.getExpireTime())
                 .version(1)
                 .build();
         return humanTaskStore.create(task);
@@ -56,6 +57,11 @@ public class WorkflowHumanTaskService {
         if (!HumanTaskStatusEnum.WAITING.getValue().equals(task.getStatus())) {
             throw new IllegalStateException("人工任务不处于等待状态");
         }
+        if (isExpired(task)) {
+            // 服务层兜底：即使调用方漏做过期校验，也不能完成已过期的人工任务。
+            expireTask(task);
+            throw new IllegalStateException("人工任务已过期，请重新生成");
+        }
         if (!task.getAssigneeUserId().equals(command.getUserId())) {
             throw new IllegalArgumentException("无权完成人工任务");
         }
@@ -74,5 +80,20 @@ public class WorkflowHumanTaskService {
      */
     public Optional<WorkflowHumanTask> getLatestWaitingTask(String taskId, String nodeType) {
         return humanTaskStore.findLatestWaiting(taskId, nodeType);
+    }
+
+    /**
+     * 判断人工任务是否已经超过有效期。
+     */
+    public boolean isExpired(WorkflowHumanTask task) {
+        return task.getExpireTime() != null && !task.getExpireTime().isAfter(LocalDateTime.now());
+    }
+
+    /**
+     * 将等待中的人工任务标记为过期，便于前端和后台审计看到明确状态。
+     */
+    public WorkflowHumanTask expireTask(WorkflowHumanTask task) {
+        task.setStatus(HumanTaskStatusEnum.EXPIRED.getValue());
+        return humanTaskStore.update(task);
     }
 }

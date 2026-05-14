@@ -78,6 +78,7 @@ export type ArticlePhase
     | 'IMAGE_GENERATING'
     | 'CONTENT_MERGING'
     | 'COMPLETED'
+    | 'EXPIRED'
     | 'FAILED'
 
 /**
@@ -142,6 +143,7 @@ export type ArticleSseMessageType
     | 'IMAGE_GENERATED'
     | 'MERGE_COMPLETE'
     | 'ALL_COMPLETE'
+    | 'WORKFLOW_EXPIRED'
     | 'ERROR'
 
 /**

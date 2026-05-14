@@ -135,6 +135,7 @@ const generationTitle = computed(() => {
   return '正文生成中'
 })
 const isCompleted = computed(() => currentPhase.value === 'COMPLETED')
+const isExpired = computed(() => currentPhase.value === 'EXPIRED')
 const selectedTitle = computed(() => {
   if (selectedTitleIndex.value === null) {
     return null
@@ -590,6 +591,16 @@ function handleArticleSseMessage(message: ArticleSseMessage) {
 
   if (message.type === 'MERGE_COMPLETE') {
     generatedContent.value = String(message.data ?? generatedContent.value)
+  }
+
+  if (message.type === 'WORKFLOW_EXPIRED') {
+    currentPhase.value = 'EXPIRED'
+    isCreating.value = false
+    isConfirmingTitle.value = false
+    isConfirmingOutline.value = false
+    isConnected.value = false
+    forgetActiveArticleTask()
+    toast.error('任务已过期，请重新生成')
   }
 
   if (message.type === 'ERROR') {
@@ -1395,6 +1406,19 @@ onMounted(() => {
               <div class="max-h-[720px] overflow-auto rounded-2xl border bg-white p-6 shadow-inner">
                 <MarkdownContentRenderer :content="generatedContent" />
               </div>
+            </UiCardContent>
+          </UiCard>
+
+          <UiCard v-else-if="isExpired" class="rounded-2xl border-0 bg-muted/40 shadow-sm">
+            <UiCardHeader>
+              <UiCardTitle>创作任务已过期</UiCardTitle>
+              <UiCardDescription>标题或大纲确认等待超过有效期，旧流程不能继续恢复。</UiCardDescription>
+            </UiCardHeader>
+            <UiCardContent>
+              <UiButton @click="resetCreatorState">
+                <RocketIcon class="mr-2 size-4" />
+                重新生成
+              </UiButton>
             </UiCardContent>
           </UiCard>
 

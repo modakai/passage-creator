@@ -11,6 +11,11 @@ import type {
 import type { IResponse } from '@/services/types/response.type'
 
 import { useApiFetch } from '@/composables/use-fetch'
+import { API_BASE_URL } from '@/constants/app-config'
+import { appLocale } from '@/plugins/i18n'
+import pinia from '@/plugins/pinia/setup'
+import { useAuthStore } from '@/stores/auth'
+import { buildApiRequestHeaders } from '@/utils/request-locale'
 
 /**
  * 创建用户端 AI 文章任务。
@@ -72,4 +77,21 @@ export async function confirmAppArticleOutline(data: AppArticleConfirmOutlineReq
     method: 'post',
     body: data,
   })
+}
+
+/**
+ * 通过后端代理下载文章图片，避免浏览器直接访问 OSS 时被 CORS 拦截。
+ */
+export async function downloadAppArticleImage(taskId: string, imageUrl: string) {
+  const authStore = useAuthStore(pinia)
+  const headers = buildApiRequestHeaders(appLocale.value, authStore.session.token ?? undefined)
+  const url = new URL(`${API_BASE_URL}/app/article/image/download`, window.location.origin)
+  url.searchParams.set('taskId', taskId)
+  url.searchParams.set('imageUrl', imageUrl)
+
+  const response = await fetch(url, { headers })
+  if (!response.ok) {
+    throw new Error(`图片下载失败：${response.status}`)
+  }
+  return await response.blob()
 }

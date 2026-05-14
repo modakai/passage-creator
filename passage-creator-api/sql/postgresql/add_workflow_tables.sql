@@ -33,9 +33,11 @@ create table if not exists public.workflow_human_task
     result_json         jsonb,
     version             integer     default 1                 not null,
     create_time         timestamp   default current_timestamp not null,
+    expire_time         timestamp,
     completed_time      timestamp,
     update_time         timestamp   default current_timestamp not null,
     is_delete           smallint    default 0                 not null
 );
 create index if not exists idx_human_task_task_node_status on public.workflow_human_task (task_id, node_type, status);
 create index if not exists idx_human_task_assignee_status on public.workflow_human_task (assignee_user_id, status);
+create index if not exists idx_human_task_status_expire on public.workflow_human_task (status, expire_time);

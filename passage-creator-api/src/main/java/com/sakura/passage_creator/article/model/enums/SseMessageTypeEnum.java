@@ -69,7 +69,12 @@ public enum SseMessageTypeEnum {
     /**
      * 生成失败。
      */
-    ERROR("ERROR", "错误");
+    ERROR("ERROR", "错误"),
+
+    /**
+     * Workflow 等待过久，checkpoint 已过期。
+     */
+    WORKFLOW_EXPIRED("WORKFLOW_EXPIRED", "Workflow 已过期");
 
     /**
      * 消息类型值。

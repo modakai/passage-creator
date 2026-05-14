@@ -54,6 +54,11 @@ datasource:
   warmup:
     enabled: false
 
+# 创作 workflow checkpoint 过期配置，超过有效期后用户必须重新生成。
+creation:
+  workflow:
+    checkpoint-ttl: 7d
+
 token:
   header-name: Authorization
   header-prefix: "Bearer "

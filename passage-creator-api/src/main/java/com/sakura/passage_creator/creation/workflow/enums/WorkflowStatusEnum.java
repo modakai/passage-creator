@@ -31,7 +31,12 @@ public enum WorkflowStatusEnum {
     /**
      * 流程失败。
      */
-    FAILED("FAILED");
+    FAILED("FAILED"),
+
+    /**
+     * 流程等待用户过久，checkpoint 已过期。
+     */
+    EXPIRED("EXPIRED");
 
     private final String value;
 

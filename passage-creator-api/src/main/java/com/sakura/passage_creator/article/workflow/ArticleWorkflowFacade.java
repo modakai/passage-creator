@@ -10,6 +10,7 @@ import com.sakura.passage_creator.article.model.dto.ArticleConfirmOutlineRequest
 import com.sakura.passage_creator.article.model.dto.ArticleConfirmTitleRequest;
 import com.sakura.passage_creator.article.model.dto.ArticleCreateRequest;
 import com.sakura.passage_creator.article.model.entity.Article;
+import com.sakura.passage_creator.article.model.enums.ArticlePhaseEnum;
 import com.sakura.passage_creator.article.model.enums.ArticleStatusEnum;
 import com.sakura.passage_creator.article.service.ArticleService;
 import com.sakura.passage_creator.creation.workflow.WorkflowContext;
@@ -19,6 +20,7 @@ import com.sakura.passage_creator.creation.workflow.WorkflowHumanTask;
 import com.sakura.passage_creator.creation.workflow.WorkflowHumanTaskCompleteCommand;
 import com.sakura.passage_creator.creation.workflow.WorkflowHumanTaskCreateCommand;
 import com.sakura.passage_creator.creation.workflow.WorkflowTask;
+import com.sakura.passage_creator.creation.workflow.config.CreationWorkflowProperties;
 import com.sakura.passage_creator.creation.workflow.enums.CreationTypeEnum;
 import com.sakura.passage_creator.creation.workflow.enums.WorkflowEventTypeEnum;
 import com.sakura.passage_creator.creation.workflow.enums.WorkflowStatusEnum;
@@ -30,6 +32,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +52,7 @@ public class ArticleWorkflowFacade {
     private final WorkflowHumanTaskService humanTaskService;
     private final WorkflowEventPublisher eventPublisher;
     private final Executor articleExecutor;
+    private final CreationWorkflowProperties workflowProperties;
 
     public ArticleWorkflowFacade(ArticleService articleService,
             ArticleWorkflowAdapter articleWorkflowAdapter,
@@ -56,7 +60,8 @@ public class ArticleWorkflowFacade {
             WorkflowTaskStore workflowTaskStore,
             WorkflowHumanTaskService humanTaskService,
             WorkflowEventPublisher eventPublisher,
-            @Qualifier("articleExecutor") Executor articleExecutor) {
+            @Qualifier("articleExecutor") Executor articleExecutor,
+            CreationWorkflowProperties workflowProperties) {
         this.articleService = articleService;
         this.articleWorkflowAdapter = articleWorkflowAdapter;
         this.graphFactory = graphFactory;
@@ -64,6 +69,7 @@ public class ArticleWorkflowFacade {
         this.humanTaskService = humanTaskService;
         this.eventPublisher = eventPublisher;
         this.articleExecutor = articleExecutor;
+        this.workflowProperties = workflowProperties;
     }
 
     /**
@@ -104,9 +110,10 @@ public class ArticleWorkflowFacade {
         result.put("selectedMainTitle", request.getSelectedMainTitle());
         result.put("selectedSubTitle", request.getSelectedSubTitle());
         result.put("userDescription", request.getUserDescription() == null ? "" : request.getUserDescription());
-        completeHumanTask(request.getTaskId(), ArticleWorkflowNodeType.TITLE_CONFIRM.getValue(), loginUser, task, result);
+        ensureHumanTaskRecoverable(request.getTaskId(), loginUser, task);
         // 人工输入先写入 Graph checkpoint，resume 后 TITLE_CONFIRM 节点才能从状态中读到选择结果。
         updateCheckpointAndContext(request.getTaskId(), result);
+        completeHumanTask(request.getTaskId(), ArticleWorkflowNodeType.TITLE_CONFIRM.getValue(), loginUser, task, result);
         submitRun(request.getTaskId(), true);
         return true;
     }
@@ -120,9 +127,10 @@ public class ArticleWorkflowFacade {
                 .orElseThrow(() -> new IllegalStateException("当前没有等待确认的大纲任务"));
         ArticleState.OutlineResult outline = request.getOutline();
         Map<String, Object> result = Map.of("confirmedOutline", outline);
-        completeHumanTask(request.getTaskId(), ArticleWorkflowNodeType.OUTLINE_CONFIRM.getValue(), loginUser, task, result);
+        ensureHumanTaskRecoverable(request.getTaskId(), loginUser, task);
         // 大纲确认同样写入 checkpoint，确保后续正文节点使用用户最终确认的大纲。
         updateCheckpointAndContext(request.getTaskId(), result);
+        completeHumanTask(request.getTaskId(), ArticleWorkflowNodeType.OUTLINE_CONFIRM.getValue(), loginUser, task, result);
         submitRun(request.getTaskId(), true);
         return true;
     }
@@ -132,6 +140,19 @@ public class ArticleWorkflowFacade {
      */
     public void retryFailedNode(String taskId) {
         submitRun(taskId, true);
+    }
+
+    /**
+     * SSE 重连时补发可恢复的人工任务；若 checkpoint 或人工任务已过期，则显式发布过期事件。
+     */
+    public void publishPendingHumanTaskIfPresent(String taskId) {
+        findPendingHumanTask(taskId).ifPresent(task -> {
+            if (humanTaskService.isExpired(task) || !graphFactory.hasCheckpoint(taskId)) {
+                expireWorkflow(taskId, task, "Workflow checkpoint 已过期，请重新生成");
+                return;
+            }
+            publishWaitingHumanTask(taskId, task, WorkflowContext.fromJson(task.getInputSnapshotJson()).getValues());
+        });
     }
 
     private void completeHumanTask(String taskId, String nodeType, LoginUserInfo loginUser,
@@ -159,6 +180,10 @@ public class ArticleWorkflowFacade {
 
     private void runGraph(String taskId, boolean resume) {
         WorkflowTask task = workflowTaskStore.getRequired(taskId);
+        if (WorkflowStatusEnum.EXPIRED.getValue().equals(task.getStatus())) {
+            // 已过期任务不能被后台重试重新拉起，必须由用户显式重新生成。
+            return;
+        }
         markTask(task, WorkflowStatusEnum.PROCESSING.getValue(), task.getCurrentNode(), null, null);
         try {
             CompiledGraph graph = graphFactory.compile(new ArticleWorkflowLifecycleListener(taskId));
@@ -210,14 +235,9 @@ public class ArticleWorkflowFacade {
                 .assigneeUserId(task.getUserId())
                 .inputSnapshotJson(WorkflowContext.fromMap(state).toJson())
                 .formSchemaJson(formSchema)
+                .expireTime(LocalDateTime.now().plus(checkpointTtl()))
                 .build());
-        // SSE payload 直接带表单 schema 和输入快照，前端刷新后也能重建确认界面。
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("humanTaskId", humanTask.getId());
-        payload.put("formSchema", JSONUtil.parseObj(formSchema));
-        payload.put("inputSnapshot", state);
-        payload.put("version", humanTask.getVersion());
-        publish(taskId, WorkflowEventTypeEnum.NODE_WAITING_USER.getValue(), nodeType, payload);
+        publishWaitingHumanTask(taskId, humanTask, state);
     }
 
     private void updateCheckpointAndContext(String taskId, Map<String, Object> updates) {
@@ -233,6 +253,59 @@ public class ArticleWorkflowFacade {
         // 同步一份业务快照，供 SSE 重连、排查问题和未来非内存 checkpoint 恢复使用。
         context.putAll(updates);
         markTask(task, WorkflowStatusEnum.PROCESSING.getValue(), task.getCurrentNode(), context.toJson(), null);
+    }
+
+    private void ensureHumanTaskRecoverable(String taskId, LoginUserInfo loginUser, WorkflowHumanTask task) {
+        if (!task.getAssigneeUserId().equals(loginUser.userId())) {
+            throw new IllegalArgumentException("无权完成人工任务");
+        }
+        if (humanTaskService.isExpired(task)) {
+            expireWorkflow(taskId, task, "人工确认任务已过期，请重新生成");
+            throw new IllegalStateException("人工确认任务已过期，请重新生成");
+        }
+        if (!graphFactory.hasCheckpoint(taskId)) {
+            expireWorkflow(taskId, task, "Workflow checkpoint 已过期，请重新生成");
+            throw new IllegalStateException("Workflow checkpoint 已过期，请重新生成");
+        }
+    }
+
+    private void publishWaitingHumanTask(String taskId, WorkflowHumanTask humanTask, Map<String, Object> state) {
+        // SSE payload 直接带表单 schema、输入快照和过期时间，前端刷新后也能重建确认界面。
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("humanTaskId", humanTask.getId());
+        payload.put("formSchema", JSONUtil.parseObj(humanTask.getFormSchemaJson()));
+        payload.put("inputSnapshot", state);
+        payload.put("version", humanTask.getVersion());
+        payload.put("expireTime", humanTask.getExpireTime());
+        publish(taskId, WorkflowEventTypeEnum.NODE_WAITING_USER.getValue(), humanTask.getNodeType(), payload);
+    }
+
+    private void expireWorkflow(String taskId, WorkflowHumanTask humanTask, String reason) {
+        WorkflowTask workflowTask = workflowTaskStore.getRequired(taskId);
+        if (WorkflowStatusEnum.EXPIRED.getValue().equals(workflowTask.getStatus())) {
+            return;
+        }
+        humanTaskService.expireTask(humanTask);
+        markTask(workflowTask, WorkflowStatusEnum.EXPIRED.getValue(), humanTask.getNodeType(),
+                workflowTask.getContextJson(), reason);
+        articleService.updateStatus(ArticleStatusEnum.FAILED, taskId);
+        articleService.updatePhase(ArticlePhaseEnum.EXPIRED, taskId);
+        publish(taskId, WorkflowEventTypeEnum.WORKFLOW_EXPIRED.getValue(), humanTask.getNodeType(),
+                Map.of("reason", reason, "nodeType", humanTask.getNodeType()));
+    }
+
+    private java.util.Optional<WorkflowHumanTask> findPendingHumanTask(String taskId) {
+        java.util.Optional<WorkflowHumanTask> titleTask = humanTaskService.getLatestWaitingTask(
+                taskId, ArticleWorkflowNodeType.TITLE_CONFIRM.getValue());
+        if (titleTask.isPresent()) {
+            return titleTask;
+        }
+        return humanTaskService.getLatestWaitingTask(taskId, ArticleWorkflowNodeType.OUTLINE_CONFIRM.getValue());
+    }
+
+    private Duration checkpointTtl() {
+        Duration ttl = workflowProperties.getCheckpointTtl();
+        return ttl == null || ttl.isNegative() || ttl.isZero() ? Duration.ofDays(7) : ttl;
     }
 
     private void failTask(String taskId, Exception e) {

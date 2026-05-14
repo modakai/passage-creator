@@ -15,12 +15,7 @@ import com.sakura.passage_creator.article.model.entity.Article;
 import com.sakura.passage_creator.article.model.enums.SseMessageTypeEnum;
 import com.sakura.passage_creator.article.model.vo.ArticleVO;
 import com.sakura.passage_creator.article.service.ArticleService;
-import com.sakura.passage_creator.article.workflow.ArticleWorkflowNodeType;
 import com.sakura.passage_creator.article.workflow.ArticleWorkflowFacade;
-import com.sakura.passage_creator.creation.workflow.WorkflowEvent;
-import com.sakura.passage_creator.creation.workflow.WorkflowHumanTask;
-import com.sakura.passage_creator.creation.workflow.enums.WorkflowEventTypeEnum;
-import com.sakura.passage_creator.creation.workflow.service.WorkflowHumanTaskService;
 import com.sakura.passage_creator.shared.common.BaseResponse;
 import com.sakura.passage_creator.shared.common.ErrorCode;
 import com.sakura.passage_creator.shared.common.ResultUtils;
@@ -46,10 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 /**
  * 用户端 文章接口
@@ -67,8 +59,6 @@ public class AppArticleController {
     private final ArticleService articleService;
 
     private final SseEmitterManager sseEmitterManager;
-
-    private final WorkflowHumanTaskService workflowHumanTaskService;
 
     private final RemoteImageDownloader remoteImageDownloader;
 
@@ -189,34 +179,7 @@ public class AppArticleController {
      * SSE 重连时补发当前等待中的人工任务。
      */
     private void sendPendingHumanTaskIfPresent(String taskId) {
-        findPendingHumanTask(taskId).ifPresent(task -> {
-            WorkflowEvent event = WorkflowEvent.builder()
-                    .type(WorkflowEventTypeEnum.NODE_WAITING_USER.getValue())
-                    .taskId(taskId)
-                    .bizType(task.getBizType())
-                    .nodeType(task.getNodeType())
-                    .payload(Map.of(
-                            "humanTaskId", task.getId(),
-                            "formSchema", JSONUtil.parseObj(StringUtils.defaultIfBlank(task.getFormSchemaJson(), "{}")),
-                            "inputSnapshot", JSONUtil.parseObj(StringUtils.defaultIfBlank(task.getInputSnapshotJson(), "{}")),
-                            "version", task.getVersion()
-                    ))
-                    .eventTime(LocalDateTime.now())
-                    .build();
-            sseEmitterManager.send(taskId, JSONUtil.toJsonStr(event));
-        });
-    }
-
-    /**
-     * 查询文章 workflow 当前可能等待的人工任务。
-     */
-    private Optional<WorkflowHumanTask> findPendingHumanTask(String taskId) {
-        Optional<WorkflowHumanTask> titleTask = workflowHumanTaskService.getLatestWaitingTask(
-                taskId, ArticleWorkflowNodeType.TITLE_CONFIRM.getValue());
-        if (titleTask.isPresent()) {
-            return titleTask;
-        }
-        return workflowHumanTaskService.getLatestWaitingTask(taskId, ArticleWorkflowNodeType.OUTLINE_CONFIRM.getValue());
+        articleWorkflowFacade.publishPendingHumanTaskIfPresent(taskId);
     }
 
     /**

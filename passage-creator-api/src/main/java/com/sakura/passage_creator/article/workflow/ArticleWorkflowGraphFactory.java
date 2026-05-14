@@ -7,10 +7,12 @@ import com.alibaba.cloud.ai.graph.KeyStrategy;
 import com.alibaba.cloud.ai.graph.KeyStrategyFactory;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
+import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
 import com.alibaba.cloud.ai.graph.checkpoint.config.SaverConfig;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.MemorySaver;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
+import com.sakura.passage_creator.creation.workflow.checkpoint.RedisWorkflowCheckpointSaver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -35,7 +37,7 @@ public class ArticleWorkflowGraphFactory {
     private final NodeAction imageAnalyzeAction;
     private final NodeAction imageGenerateAction;
     private final NodeAction contentMergeAction;
-    private final MemorySaver memorySaver;
+    private final BaseCheckpointSaver checkpointSaver;
 
     @Autowired
     public ArticleWorkflowGraphFactory(ArticleTitleNodeHandler titleAction,
@@ -45,7 +47,8 @@ public class ArticleWorkflowGraphFactory {
             ArticleContentNodeHandler contentAction,
             ArticleImageAnalyzeNodeHandler imageAnalyzeAction,
             ArticleImageGenerateNodeHandler imageGenerateAction,
-            ArticleContentMergeNodeHandler contentMergeAction) {
+            ArticleContentMergeNodeHandler contentMergeAction,
+            RedisWorkflowCheckpointSaver checkpointSaver) {
         this((NodeAction) titleAction,
                 titleConfirmedAction,
                 outlineAction,
@@ -53,7 +56,8 @@ public class ArticleWorkflowGraphFactory {
                 contentAction,
                 imageAnalyzeAction,
                 imageGenerateAction,
-                contentMergeAction);
+                contentMergeAction,
+                checkpointSaver);
     }
 
     ArticleWorkflowGraphFactory(NodeAction titleAction,
@@ -64,6 +68,26 @@ public class ArticleWorkflowGraphFactory {
             NodeAction imageAnalyzeAction,
             NodeAction imageGenerateAction,
             NodeAction contentMergeAction) {
+        this(titleAction,
+                titleConfirmedAction,
+                outlineAction,
+                outlineConfirmedAction,
+                contentAction,
+                imageAnalyzeAction,
+                imageGenerateAction,
+                contentMergeAction,
+                MemorySaver.builder().build());
+    }
+
+    ArticleWorkflowGraphFactory(NodeAction titleAction,
+            NodeAction titleConfirmedAction,
+            NodeAction outlineAction,
+            NodeAction outlineConfirmedAction,
+            NodeAction contentAction,
+            NodeAction imageAnalyzeAction,
+            NodeAction imageGenerateAction,
+            NodeAction contentMergeAction,
+            BaseCheckpointSaver checkpointSaver) {
         this.titleAction = titleAction;
         this.titleConfirmedAction = titleConfirmedAction;
         this.outlineAction = outlineAction;
@@ -72,8 +96,8 @@ public class ArticleWorkflowGraphFactory {
         this.imageAnalyzeAction = imageAnalyzeAction;
         this.imageGenerateAction = imageGenerateAction;
         this.contentMergeAction = contentMergeAction;
-        // 当前先用内存 checkpoint 打通 HITL 恢复链路，生产重启恢复需要替换为持久化 saver。
-        this.memorySaver = MemorySaver.builder().build();
+        // 生产环境注入 Redis saver；测试构造器仍使用 MemorySaver 保持单测轻量。
+        this.checkpointSaver = checkpointSaver;
     }
 
     /**
@@ -88,7 +112,7 @@ public class ArticleWorkflowGraphFactory {
      */
     public CompiledGraph compile(GraphLifecycleListener listener) throws GraphStateException {
         CompileConfig.Builder builder = CompileConfig.builder()
-                .saverConfig(SaverConfig.builder().register(memorySaver).build())
+                .saverConfig(SaverConfig.builder().register(checkpointSaver).build())
                 // 标题和大纲生成后必须停住，把选择权交给用户，而不是自动流到下一节点。
                 .interruptAfter(
                         ArticleWorkflowNodeType.TITLE_GENERATING.getValue(),
@@ -99,6 +123,14 @@ public class ArticleWorkflowGraphFactory {
             builder.withLifecycleListener(listener);
         }
         return buildGraph().compile(builder.build());
+    }
+
+    /**
+     * 判断当前 taskId 是否还有可恢复 checkpoint，用于人工确认前拦截已过期流程。
+     */
+    public boolean hasCheckpoint(String taskId) {
+        return checkpointSaver.get(com.alibaba.cloud.ai.graph.RunnableConfig.builder().threadId(taskId).build())
+                .isPresent();
     }
 
     /**

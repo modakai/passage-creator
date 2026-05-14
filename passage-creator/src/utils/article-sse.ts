@@ -87,7 +87,7 @@ export function connectArticleSse(taskId: string, options: ConnectArticleSseOpti
             const message = JSON.parse(data) as ArticleSseMessage
             options.onMessage(message)
 
-            if (message.type === 'ALL_COMPLETE' || message.type === 'ERROR') {
+            if (message.type === 'ALL_COMPLETE' || message.type === 'ERROR' || message.type === 'WORKFLOW_EXPIRED') {
               controller.abort()
             }
           }

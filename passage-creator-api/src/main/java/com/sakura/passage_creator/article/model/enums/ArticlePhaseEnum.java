@@ -32,6 +32,7 @@ public enum ArticlePhaseEnum {
     IMAGE_GENERATING("IMAGE_GENERATING", "生成配图中"),
     CONTENT_MERGING("CONTENT_MERGING", "图文合成中"),
     COMPLETED("COMPLETED", "已完成"),
+    EXPIRED("EXPIRED", "已过期"),
     FAILED("FAILED", "失败");
 
     final String value;
@@ -59,6 +60,7 @@ public enum ArticlePhaseEnum {
             case IMAGE_ANALYZING -> IMAGE_GENERATING;
             case IMAGE_GENERATING -> CONTENT_MERGING;
             case CONTENT_MERGING -> COMPLETED;
+            case EXPIRED -> EXPIRED;
             default -> FAILED;
         };
         return phaseEnum.getValue();

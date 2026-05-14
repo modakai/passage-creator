@@ -36,6 +36,10 @@ public class WorkflowHumanTask implements Serializable {
     private String resultJson;
     private Integer version;
     private LocalDateTime createTime;
+    /**
+     * 人工任务过期时间，必须和 Graph checkpoint TTL 保持一致。
+     */
+    private LocalDateTime expireTime;
     private LocalDateTime completedTime;
     private LocalDateTime updateTime;
 

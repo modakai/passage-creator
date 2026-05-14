@@ -33,9 +33,11 @@ create table if not exists workflow_human_task
     result_json         json                                   null comment '用户提交结果',
     version             int         default 1                  not null comment '乐观锁版本',
     create_time         datetime    default CURRENT_TIMESTAMP  not null comment '创建时间',
+    expire_time         datetime                               null comment '人工任务过期时间',
     completed_time      datetime                               null comment '完成时间',
     update_time         datetime    default CURRENT_TIMESTAMP  not null on update CURRENT_TIMESTAMP comment '更新时间',
     is_delete           tinyint     default 0                  not null comment '是否删除',
     key idx_human_task_task_node_status (task_id, node_type, status),
-    key idx_human_task_assignee_status (assignee_user_id, status)
+    key idx_human_task_assignee_status (assignee_user_id, status),
+    key idx_human_task_status_expire (status, expire_time)
 ) comment '通用创作 Workflow 人工任务表' collate = utf8mb4_unicode_ci;
