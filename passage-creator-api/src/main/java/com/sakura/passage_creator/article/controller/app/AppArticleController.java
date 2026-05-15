@@ -164,10 +164,12 @@ public class AppArticleController {
      */
     private SseEmitter createProgressEmitter(String taskId) {
         ThrowUtils.throwIf(StringUtils.isBlank(taskId), ErrorCode.PARAMS_ERROR, "任务 id 不能为空");
-        Article article = articleService.getOwnedArticleByTaskId(taskId, LoginUserContext.getLoginUser());
-        // SSE 连接由管理器按 taskId 保存，后续异步阶段通过 taskId 推送消息。
+        LoginUserInfo loginUser = LoginUserContext.getLoginUser();
+        // 先做归属校验，再注册 SSE；注册后重新读取快照，避免生成完成事件夹在查询和建连之间被丢失。
+        articleService.getOwnedArticleByTaskId(taskId, loginUser);
         SseEmitter emitter = sseEmitterManager.createEmitter(taskId);
-        ArticleVO articleVO = articleService.getArticleVO(article);
+        Article latestArticle = articleService.getOwnedArticleByTaskId(taskId, loginUser);
+        ArticleVO articleVO = articleService.getArticleVO(latestArticle);
         SseMessage<ArticleVO> message = SseMessage.of(SseMessageTypeEnum.PROGRESS, articleVO);
         sseEmitterManager.send(taskId, JSONUtil.toJsonStr(message));
         // 恢复 Human-in-the-Loop 等待态，避免刷新页面后只看到文章快照而缺少确认表单。

@@ -26,6 +26,7 @@ import type {
   ArticleSseMessage,
   ArticleTitleOption,
 } from '@/services/types/app-article.type'
+import type { PromptFeedbackStage } from '@/services/types/prompt-template.type'
 
 import MarkdownContentRenderer from '@/components/article/markdown-content-renderer.vue'
 import {
@@ -36,6 +37,8 @@ import {
 } from '@/services/api/app-article.api'
 import { useGetCreditSummaryQuery } from '@/services/api/credit.api'
 import { connectArticleSse } from '@/utils/article-sse'
+
+import PromptFeedbackCard from './components/prompt-feedback-card.vue'
 
 type ArticleStyle = '默认' | '科技风格' | '情感风格' | '教育风格' | '轻松幽默'
 type ImageMethod = 'GPT_IMAGE' | 'PEXELS' | 'MERMAID' | 'ICONIFY' | 'SVG_DIAGRAM'
@@ -69,6 +72,12 @@ const activeArticleTaskTtlMs = 7 * 24 * 60 * 60 * 1000
 interface ActiveArticleTaskCache {
   taskId: string
   savedAt: number
+}
+
+interface ActivePromptFeedback {
+  stage: PromptFeedbackStage
+  title: string
+  description: string
 }
 
 const steps = computed(() => [
@@ -136,6 +145,34 @@ const generationTitle = computed(() => {
 })
 const isCompleted = computed(() => currentPhase.value === 'COMPLETED')
 const isExpired = computed(() => currentPhase.value === 'EXPIRED')
+const activePromptFeedback = computed<ActivePromptFeedback | null>(() => {
+  // 反馈提示是页面级浮层，只在三个可评价环节出现。
+  if (!taskId.value) {
+    return null
+  }
+  if (isTitleSelecting.value) {
+    return {
+      stage: 'TITLE_SELECTION',
+      title: '这轮标题效果如何？',
+      description: '反馈只用于改进 Prompt，不影响继续创作。',
+    }
+  }
+  if (isOutlineEditing.value) {
+    return {
+      stage: 'OUTLINE_EDITING',
+      title: '这轮大纲效果如何？',
+      description: '反馈可以跳过，确认大纲不受影响。',
+    }
+  }
+  if (isCompleted.value) {
+    return {
+      stage: 'CONTENT_MERGED',
+      title: '正文融合效果如何？',
+      description: '这条反馈会关联本次正文 Prompt 版本。',
+    }
+  }
+  return null
+})
 const selectedTitle = computed(() => {
   if (selectedTitleIndex.value === null) {
     return null
@@ -1539,6 +1576,14 @@ onMounted(() => {
         </div>
       </aside>
     </main>
+
+    <PromptFeedbackCard
+      v-if="activePromptFeedback"
+      :task-id="taskId"
+      :stage="activePromptFeedback.stage"
+      :title="activePromptFeedback.title"
+      :description="activePromptFeedback.description"
+    />
   </div>
 </template>
 

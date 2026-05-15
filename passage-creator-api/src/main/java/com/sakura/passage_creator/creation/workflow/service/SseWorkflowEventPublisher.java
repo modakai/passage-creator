@@ -50,6 +50,9 @@ public class SseWorkflowEventPublisher implements WorkflowEventPublisher {
         if (WorkflowEventTypeEnum.NODE_RESULT.getValue().equals(event.getType())) {
             sendArticleNodeResult(event);
         }
+        if (WorkflowEventTypeEnum.NODE_WAITING_USER.getValue().equals(event.getType())) {
+            sendArticleWaitingUser(event);
+        }
         if (WorkflowEventTypeEnum.WORKFLOW_COMPLETED.getValue().equals(event.getType())) {
             Object fullContent = event.getPayload().get("fullContent");
             if (fullContent != null) {
@@ -97,6 +100,23 @@ public class SseWorkflowEventPublisher implements WorkflowEventPublisher {
         }
         else if (ArticleWorkflowNodeType.CONTENT_MERGING.getValue().equals(event.getNodeType())) {
             send(event.getTaskId(), SseMessageTypeEnum.MERGE_COMPLETE, payload.get("fullContent"));
+        }
+    }
+
+    /**
+     * 将重连补发的人工等待态转换成旧前端能直接消费的文章事件。
+     */
+    @SuppressWarnings("unchecked")
+    private void sendArticleWaitingUser(WorkflowEvent event) {
+        Object snapshot = event.getPayload().get("inputSnapshot");
+        if (!(snapshot instanceof Map<?, ?> inputSnapshot)) {
+            return;
+        }
+        if (ArticleWorkflowNodeType.TITLE_CONFIRM.getValue().equals(event.getNodeType())) {
+            send(event.getTaskId(), SseMessageTypeEnum.TITLES_GENERATED, inputSnapshot.get("titleOptions"));
+        }
+        else if (ArticleWorkflowNodeType.OUTLINE_CONFIRM.getValue().equals(event.getNodeType())) {
+            send(event.getTaskId(), SseMessageTypeEnum.OUTLINE_GENERATED, inputSnapshot.get("outline"));
         }
     }
 

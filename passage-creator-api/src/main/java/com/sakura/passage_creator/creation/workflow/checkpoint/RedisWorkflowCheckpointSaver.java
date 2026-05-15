@@ -1,12 +1,16 @@
 package com.sakura.passage_creator.creation.workflow.checkpoint;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
 import com.alibaba.cloud.ai.graph.checkpoint.Checkpoint;
 import com.sakura.passage_creator.creation.workflow.config.CreationWorkflowProperties;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -20,16 +24,22 @@ import java.util.Optional;
  * Redis checkpoint saver，让 Spring AI Alibaba StateGraph 的中断点可跨服务重启恢复。
  */
 @Component
+@Slf4j
 public class RedisWorkflowCheckpointSaver implements BaseCheckpointSaver {
 
     private static final String KEY_PREFIX = "creation:workflow:checkpoint:";
+    private static final TypeReference<List<CheckpointRecord>> CHECKPOINT_RECORD_LIST_TYPE = new TypeReference<>() {
+    };
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
     private final CreationWorkflowProperties properties;
 
-    public RedisWorkflowCheckpointSaver(RedisTemplate<String, Object> redisTemplate,
-                                        CreationWorkflowProperties properties) {
+    public RedisWorkflowCheckpointSaver(StringRedisTemplate redisTemplate,
+            ObjectMapper objectMapper,
+            CreationWorkflowProperties properties) {
         this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
         this.properties = properties;
     }
 
@@ -87,30 +97,38 @@ public class RedisWorkflowCheckpointSaver implements BaseCheckpointSaver {
      */
     public boolean exists(String threadId) {
         Boolean exists = redisTemplate.hasKey(key(threadId));
-        return exists && get(RunnableConfig.builder().threadId(threadId).build()).isPresent();
+        return Boolean.TRUE.equals(exists) && get(RunnableConfig.builder().threadId(threadId).build()).isPresent();
     }
 
     private void saveCheckpoints(String threadId, LinkedList<Checkpoint> checkpoints) {
         List<CheckpointRecord> records = checkpoints.stream()
                 .map(CheckpointRecord::fromCheckpoint)
                 .toList();
-        redisTemplate.opsForValue().set(key(threadId), records, ttl());
+        try {
+            // 使用专用 JSON 字符串保存 checkpoint，避免全局 RedisTemplate 的 default typing 影响 Graph 恢复。
+            redisTemplate.opsForValue().set(key(threadId), objectMapper.writeValueAsString(records), ttl());
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("序列化 workflow checkpoint 失败", e);
+        }
     }
 
-    @SuppressWarnings("unchecked")
     private LinkedList<Checkpoint> loadCheckpoints(String threadId) {
-        Object value = redisTemplate.opsForValue().get(key(threadId));
-        if (!(value instanceof List<?> records)) {
+        String value = redisTemplate.opsForValue().get(key(threadId));
+        if (value == null || value.isBlank()) {
+            return new LinkedList<>();
+        }
+        List<CheckpointRecord> records;
+        try {
+            records = objectMapper.readValue(value, CHECKPOINT_RECORD_LIST_TYPE);
+        } catch (JsonProcessingException e) {
+            // 旧版本可能写入了不兼容的 Redis 序列化结构；删除坏 checkpoint，让业务层走过期恢复分支。
+            log.warn("workflow checkpoint 反序列化失败，已删除不兼容 checkpoint, threadId={}", threadId, e);
+            redisTemplate.delete(key(threadId));
             return new LinkedList<>();
         }
         LinkedList<Checkpoint> checkpoints = new LinkedList<>();
-        for (Object record : records) {
-            if (record instanceof CheckpointRecord checkpointRecord) {
-                checkpoints.add(checkpointRecord.toCheckpoint());
-            } else if (record instanceof Map<?, ?> map) {
-                // Jackson 反序列化为 Map 时也能恢复，避免 RedisTemplate 类型信息差异导致 checkpoint 丢失。
-                checkpoints.add(CheckpointRecord.fromMap((Map<String, Object>) map).toCheckpoint());
-            }
+        for (CheckpointRecord record : records) {
+            checkpoints.add(record.toCheckpoint());
         }
         return checkpoints;
     }
@@ -147,16 +165,6 @@ public class RedisWorkflowCheckpointSaver implements BaseCheckpointSaver {
             record.setNextNodeId(checkpoint.getNextNodeId());
             return record;
         }
-
-        static CheckpointRecord fromMap(Map<String, Object> map) {
-            CheckpointRecord record = new CheckpointRecord();
-            record.setId((String) map.get("id"));
-            record.setState((Map<String, Object>) map.get("state"));
-            record.setNodeId((String) map.get("nodeId"));
-            record.setNextNodeId((String) map.get("nextNodeId"));
-            return record;
-        }
-
         Checkpoint toCheckpoint() {
             return Checkpoint.builder()
                     .id(id)

@@ -317,6 +317,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/prompt-feedback/': RouteRecordInfo<
+      '/prompt-feedback/',
+      '/prompt-feedback',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/prompt-templates/': RouteRecordInfo<
       '/prompt-templates/',
       '/prompt-templates',
@@ -635,6 +642,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/profile/index.vue': {
       routes:
         | '/profile/'
+      views:
+        | never
+    }
+    'src/pages/prompt-feedback/index.vue': {
+      routes:
+        | '/prompt-feedback/'
       views:
         | never
     }

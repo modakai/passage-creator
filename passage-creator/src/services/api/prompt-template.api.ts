@@ -4,6 +4,10 @@ import type {
   PromptTemplateForm,
   PromptTemplateItem,
   PromptTemplateQuery,
+  PromptFeedbackItem,
+  PromptFeedbackQuery,
+  PromptFeedbackStatsItem,
+  PromptFeedbackSubmitRequest,
   PromptUsageLogItem,
   PromptUsageLogQuery,
 } from '@/services/types/prompt-template.type'
@@ -56,6 +60,47 @@ export function useGetPromptUsageLogPageQuery(query: PromptUsageLogQuery) {
   return useQuery<IResponse<IPageResponse<PromptUsageLogItem>>, Error>({
     queryKey: computed(() => ['prompt-usage-log-page', { ...query }]),
     queryFn: async () => await apiFetch<IResponse<IPageResponse<PromptUsageLogItem>>>('/prompt/template/usage/list/page', {
+      method: 'post',
+      body: normalizeQuery(query),
+    }),
+  })
+}
+
+/**
+ * 提交用户端 Prompt 效果反馈。
+ */
+export async function submitPromptFeedback(data: PromptFeedbackSubmitRequest) {
+  const { apiFetch } = useApiFetch()
+  return await apiFetch<IResponse<PromptFeedbackItem>>('/prompt/feedback/submit', {
+    method: 'post',
+    body: data,
+  })
+}
+
+/**
+ * 获取 Prompt 反馈分页列表。
+ */
+export function useGetPromptFeedbackPageQuery(query: PromptFeedbackQuery) {
+  const { apiFetch } = useApiFetch()
+
+  return useQuery<IResponse<IPageResponse<PromptFeedbackItem>>, Error>({
+    queryKey: computed(() => ['prompt-feedback-page', { ...query }]),
+    queryFn: async () => await apiFetch<IResponse<IPageResponse<PromptFeedbackItem>>>('/prompt/feedback/list/page', {
+      method: 'post',
+      body: normalizeQuery(query),
+    }),
+  })
+}
+
+/**
+ * 获取 Prompt 反馈四档满意度占比统计。
+ */
+export function useGetPromptFeedbackStatsQuery(query: PromptFeedbackQuery) {
+  const { apiFetch } = useApiFetch()
+
+  return useQuery<IResponse<PromptFeedbackStatsItem[]>, Error>({
+    queryKey: computed(() => ['prompt-feedback-stats', { ...query }]),
+    queryFn: async () => await apiFetch<IResponse<PromptFeedbackStatsItem[]>>('/prompt/feedback/stats', {
       method: 'post',
       body: normalizeQuery(query),
     }),

@@ -15,6 +15,7 @@ public enum CreationTypeEnum {
 
     /**
      * 小红书风格创作预留类型，代码和数据库统一使用 rednote。
+     * https://my.feishu.cn/wiki/Vtn4w4xndisR1zknE37ccLNunDf
      */
     REDNOTE("rednote"),
 
