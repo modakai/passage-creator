@@ -1,0 +1,37 @@
+-- 小红书爆款笔记表，用于保存 rednote 全自动 workflow 的输入、阶段结果和图片产物。
+create table if not exists rednote_note
+(
+    id                 bigint                                not null comment '主键 id'
+        primary key,
+    task_id            varchar(64)                           not null comment 'Workflow 任务 ID（UUID）',
+    user_id            bigint                                not null comment '创建用户 id',
+    content            text                                  not null comment '用户原始自然语言创作需求',
+    subject            varchar(300)                          null comment 'SearchAgent 解析出的核心主体/产品/场景',
+    context            text                                  null comment 'SearchAgent 整理后的创作上下文',
+    content_length     varchar(32)                           null comment '篇幅档位：SHORT/MEDIUM/LONG',
+    target_word_count  int                                   null comment '目标字数',
+    keywords           json                                  null comment '关键词列表 JSON',
+    tag_count          int         default 5                  not null comment '标签数量，默认 5',
+    image_count        int         default 3                  not null comment '普通配图数量，最多 5，不含封面',
+    search_results     json                                  null comment '搜索结果摘要 JSON',
+    body_content       text                                  null comment '小红书正文主体',
+    tags               json                                  null comment '标签列表 JSON',
+    cover_title        varchar(200)                          null comment '封面标题',
+    cover_prompt       text                                  null comment '封面图片提示词',
+    image_prompts      json                                  null comment '普通配图提示词计划 JSON',
+    images             json                                  null comment '配图结果列表 JSON，包含 URL、状态和失败原因',
+    cover_image        varchar(512)                          null comment '封面图 URL',
+    status             varchar(32) default 'PENDING'          not null comment '状态：PENDING/PROCESSING/COMPLETED/FAILED',
+    phase              varchar(64) default 'PENDING'          not null comment '阶段：PENDING/SEARCH_AGENT/COPY_GENERATING/IMAGE_PROMPT_GENERATING/IMAGE_GENERATING/COMPLETED/FAILED',
+    error_message      text                                  null comment '失败错误信息',
+    create_time        datetime    default CURRENT_TIMESTAMP  not null comment '创建时间',
+    completed_time     datetime                              null comment '完成时间',
+    update_time        datetime    default CURRENT_TIMESTAMP  not null on update CURRENT_TIMESTAMP comment '更新时间',
+    is_delete          tinyint     default 0                  not null comment '逻辑删除：0-否，1-是',
+    unique key uk_rednote_task_id (task_id),
+    key idx_rednote_user_time (user_id, create_time),
+    key idx_rednote_status (status),
+    key idx_rednote_phase (phase),
+    key idx_rednote_subject (subject),
+    key idx_rednote_user_status (user_id, status)
+) comment '小红书爆款笔记表' collate = utf8mb4_unicode_ci;
