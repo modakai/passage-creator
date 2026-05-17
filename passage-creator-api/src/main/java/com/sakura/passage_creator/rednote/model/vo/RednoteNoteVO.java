@@ -75,19 +75,9 @@ public class RednoteNoteVO implements Serializable {
     private String searchResults;
 
     /**
-     * 开头钩子文案。
-     */
-    private String hookText;
-
-    /**
      * 小红书正文主体。
      */
     private String bodyContent;
-
-    /**
-     * 行动引导文案。
-     */
-    private String callToAction;
 
     /**
      * 标签列表 JSON 文本。
@@ -95,7 +85,7 @@ public class RednoteNoteVO implements Serializable {
     private String tags;
 
     /**
-     * 封面标题。
+     * 封面标题，由后续图片提示词节点生成。
      */
     private String coverTitle;
 

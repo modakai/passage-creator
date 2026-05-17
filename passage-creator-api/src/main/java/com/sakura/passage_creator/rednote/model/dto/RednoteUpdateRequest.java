@@ -66,21 +66,9 @@ public class RednoteUpdateRequest implements Serializable {
     private String searchResults;
 
     /**
-     * 开头钩子文案。
-     */
-    @Size(max = 1000, message = "开头钩子不能超过 1000 个字符")
-    private String hookText;
-
-    /**
      * 小红书正文主体。
      */
     private String bodyContent;
-
-    /**
-     * 行动引导文案。
-     */
-    @Size(max = 1000, message = "行动引导不能超过 1000 个字符")
-    private String callToAction;
 
     /**
      * 标签列表 JSON 文本。
@@ -88,7 +76,7 @@ public class RednoteUpdateRequest implements Serializable {
     private String tags;
 
     /**
-     * 封面标题。
+     * 封面标题，由后续图片提示词节点生成。
      */
     @Size(max = 200, message = "封面标题不能超过 200 个字符")
     private String coverTitle;

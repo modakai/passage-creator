@@ -2,7 +2,7 @@
 
 现有文章创作已经使用 Spring AI Alibaba `StateGraph` 编排，并通过 `workflow_task`、Redis checkpoint、workflow 事件和 SSE 兼容层保存流程状态。历史设计已经明确：未来 `rednote` 不应复用文章 Graph，也不应抽一个过度通用的 workflow 模板。
 
-小红书爆款创作和文章创作的核心差异不只是 Prompt 风格，而是输入理解和输出结构不同。文章围绕标题、大纲、正文和配图；小红书笔记围绕用户自然语言意图、搜索整理后的创作简报、开头钩子、场景痛点、种草理由、行动引导、标签、图片组和封面吸引力。若直接改造文章表或文章节点，会把两套内容模型混在一起。
+小红书爆款创作和文章创作的核心差异不只是 Prompt 风格，而是输入理解和输出结构不同。文章围绕标题、大纲、正文和配图；小红书笔记围绕用户自然语言意图、搜索整理后的创作简报、小红书正文、标签、图片组和封面吸引力。若直接改造文章表或文章节点，会把两套内容模型混在一起。
 
 ## Goals / Non-Goals
 
@@ -26,7 +26,7 @@
 
 ### Decision: Rednote 使用独立业务表
 
-新增 `rednote_note` 表作为小红书任务主表，字段覆盖 `task_id`、`user_id`、用户原始 `content`、SearchAgent 解析出的 `subject`、结构化 `context`、`content_length`、`target_word_count`、`keywords`、`tag_count`、`image_count`、`search_results`、钩子文案、正文、行动引导、标签、图片提示词、图片列表、封面提示词、封面标题、封面图、状态、阶段和错误信息。
+新增 `rednote_note` 表作为小红书任务主表，字段覆盖 `task_id`、`user_id`、用户原始 `content`、SearchAgent 解析出的 `subject`、结构化 `context`、`content_length`、`target_word_count`、`keywords`、`tag_count`、`image_count`、`search_results`、小红书内容、标签、图片提示词、图片列表、封面提示词、封面标题、封面图、状态、阶段和错误信息。
 
 原因：小红书节点输出结构与文章不同，独立表能让列表、详情、重试和后台排查直接读取领域数据，而不是反复解析 Graph state。
 
@@ -77,6 +77,8 @@ SearchAgent、CopywritingAgent、ImagePromptAgent 使用 Spring AI Alibaba Agent
 - ImagePromptAgent: 基于结构化文案生成封面提示词和普通配图提示词。
 
 原因：Agent as Node 适合需要工具调用和多步推理的节点，同时 StateGraph 仍负责阶段顺序、checkpoint、事件和失败状态。工具权限按 Agent 职责收窄，避免一个 Agent 拿到过多工具导致行为不可控。
+
+SearchAgent 的业务状态同步使用 Agent Hook 完成：`BEFORE_AGENT` 将 rednote 任务推进到搜索阶段，`AFTER_AGENT` 解析 RednoteBrief、写入 `rednote_note` 并返回后续节点可读的扁平 state。网页搜索工具属于外部 I/O，第一版使用 Spring AI Alibaba 内置 `ToolRetryInterceptor` 对 `rednote_web_search` 做短暂重试和错误消息回传。
 
 备选方案是所有节点都用普通 `NodeAction` + ChatClient。该方案更可控，但 SearchAgent 的搜索、分析和自动补全逻辑会变得僵硬，工具调用扩展性较差。
 

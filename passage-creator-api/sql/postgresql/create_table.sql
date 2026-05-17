@@ -117,9 +117,7 @@ create table if not exists public.rednote_note
     tag_count          integer      default 5 not null,
     image_count        integer      default 3 not null,
     search_results     jsonb,
-    hook_text          varchar(1000),
     body_content       text,
-    call_to_action     varchar(1000),
     tags               jsonb,
     cover_title        varchar(200),
     cover_prompt       text,
@@ -148,9 +146,7 @@ comment on column public.rednote_note.keywords is '关键词列表 JSON';
 comment on column public.rednote_note.tag_count is '标签数量，默认 5';
 comment on column public.rednote_note.image_count is '普通配图数量，最多 5，不含封面';
 comment on column public.rednote_note.search_results is '搜索结果摘要 JSON';
-comment on column public.rednote_note.hook_text is '开头钩子文案';
 comment on column public.rednote_note.body_content is '小红书正文主体';
-comment on column public.rednote_note.call_to_action is '行动引导文案';
 comment on column public.rednote_note.tags is '标签列表 JSON';
 comment on column public.rednote_note.cover_title is '封面标题';
 comment on column public.rednote_note.cover_prompt is '封面图片提示词';

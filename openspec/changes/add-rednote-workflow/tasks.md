@@ -7,15 +7,15 @@
 
 ## 2. Rednote Workflow 编排
 
-- [ ] 2.1 新增 `RednoteWorkflowNodeType`，覆盖 SearchAgent、文案生成 Agent、图片提示词 Agent 和图片生成节点
-- [ ] 2.2 新增 rednote workflow state 字段定义，明确 taskId、content、subject、context、contentLength、targetWordCount、keywords、tagCount、imageCount、searchResults、copywriting、coverPrompt、imagePrompts、images、coverImage、tags 等状态键
+- [x] 2.1 新增 `RednoteWorkflowNodeType`，覆盖 SearchAgent、文案生成 Agent、图片提示词 Agent 和图片生成节点
+- [x] 2.2 新增 rednote workflow state 字段定义，明确 taskId、content、subject、context、contentLength、targetWordCount、keywords、tagCount、imageCount、searchResults、copywriting、coverPrompt、imagePrompts、images、coverImage、tags 等状态键
 - [ ] 2.3 新增 `RednoteWorkflowGraphFactory`，使用独立 StateGraph 串联 Agent-as-Node 和普通 NodeAction，并复用 Redis checkpoint saver
 - [ ] 2.4 新增 rednote workflow lifecycle listener，将节点开始、节点结果、完成和失败事件同步到 `workflow_task` 与 SSE 事件
 
 ## 3. Rednote Agent 与节点处理
 
-- [ ] 3.1 新增 SearchAgent 节点，接收用户原始 `content`，调用搜索/摘要/素材工具，并输出 subject、context、contentLength、targetWordCount、keywords、tagCount、imageCount、searchResults
-- [ ] 3.2 新增文案生成 Agent 节点，仅基于 RednoteBrief 输出开头钩子、正文主体、行动引导、标签建议和封面标题建议
+- [x] 3.1 新增 SearchAgent 节点，接收用户原始 `content`，调用搜索/摘要/素材工具，并输出 subject、context、contentLength、targetWordCount、keywords、tagCount、imageCount、searchResults
+- [x] 3.2 新增文案生成 Agent 节点，仅基于 RednoteBrief 输出小红书内容 `body_content` 和标签 `tags`
 - [ ] 3.3 新增图片提示词 Agent 节点，输出封面提示词和普通图片提示词列表，并保证普通图片提示词数量最多 5 条
 - [ ] 3.4 新增图片生成普通节点，复用现有图片服务并行生成普通配图和封面图，保存图片 URL、提示词、位置、状态和失败原因，并在完成后结束 workflow
 

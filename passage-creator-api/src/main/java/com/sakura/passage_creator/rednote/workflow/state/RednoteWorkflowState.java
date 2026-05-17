@@ -118,6 +118,16 @@ public class RednoteWorkflowState {
     public static final String KEY_TAGS = "tags";
 
     /**
+     * 小红书正文主体状态键。
+     */
+    public static final String KEY_BODY_CONTENT = "bodyContent";
+
+    /**
+     * 封面标题状态键，由后续图片提示词节点写入。
+     */
+    public static final String KEY_COVER_TITLE = "coverTitle";
+
+    /**
      * 任务id
      */
     private String taskId;
@@ -151,6 +161,7 @@ public class RednoteWorkflowState {
      * 封面标题
      */
     private String coverTitle;
+
     /**
      * 封面图片
      */
@@ -242,6 +253,26 @@ public class RednoteWorkflowState {
     }
 
     /**
+     * 文案 Agent 输出的结构化小红书内容。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ContentResponse implements Serializable {
+
+        /**
+         * 可直接发布的小红书内容，不包含标签。
+         */
+        private String bodyContent;
+
+        /**
+         * 标签建议列表，保存时会序列化到 rednote_note.tags。
+         */
+        private List<String> tags;
+    }
+
+    /**
      * 图片提示词 Agent 输出结构。
      */
     @Data
@@ -261,4 +292,3 @@ public class RednoteWorkflowState {
         private String imagePrompts;
     }
 }
-

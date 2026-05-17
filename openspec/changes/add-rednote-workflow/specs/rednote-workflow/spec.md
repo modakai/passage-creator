@@ -45,7 +45,7 @@
 系统 SHALL 将小红书创作输入、中间结构化结果和图片生成结果保存到 rednote 业务表。
 
 #### Scenario: 节点输出保存到业务表
-- **WHEN** rednote workflow 节点产生 RednoteBrief、钩子文案、正文、标签、图片提示词、普通配图或封面
+- **WHEN** rednote workflow 节点产生 RednoteBrief、小红书内容、标签、图片提示词、普通配图或封面
 - **THEN** 系统将该节点结果保存到 rednote 业务表，并同步必要状态到 workflow 上下文
 
 #### Scenario: 详情查询读取业务表
@@ -57,7 +57,7 @@
 
 #### Scenario: 生成结构化文案
 - **WHEN** 文案生成节点完成
-- **THEN** 系统保存开头钩子、正文主体、行动引导、标签建议和封面标题建议
+- **THEN** 系统保存小红书内容和标签建议，封面标题由后续图片提示词节点生成
 
 #### Scenario: 生成结构化图片计划
 - **WHEN** 图片提示词生成节点完成

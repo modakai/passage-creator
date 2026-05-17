@@ -12,4 +12,6 @@ public interface UniversalConstant {
 
     String SEARCH_AGENT_NAME = "RednoteSearchAgent";
 
+    String REDNOTE_CONTENT_AGENT_NAME = "RednoteContentAgent";
+
 }
