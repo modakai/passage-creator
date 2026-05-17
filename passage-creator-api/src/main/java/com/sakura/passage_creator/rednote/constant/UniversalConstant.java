@@ -10,6 +10,8 @@ public interface UniversalConstant {
 
     String SEARCH_TOOL_NAME = "rednote_web_search";
 
+    String URL_FETCH_TOOL_NAME = "rednote_url_fetch";
+
     String SEARCH_AGENT_NAME = "RednoteSearchAgent";
 
     String REDNOTE_CONTENT_AGENT_NAME = "RednoteContentAgent";

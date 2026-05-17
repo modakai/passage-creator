@@ -8,6 +8,7 @@ import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.agent.interceptor.toolretry.ToolRetryInterceptor;
 import com.alibaba.cloud.ai.graph.internal.node.Node;
 import com.sakura.passage_creator.rednote.agent.hook.RednoteSearchAgentHook;
+import com.sakura.passage_creator.rednote.agent.tool.search.RednoteUrlFetchTools;
 import com.sakura.passage_creator.rednote.agent.tool.search.RednoteWebSearchTools;
 import com.sakura.passage_creator.rednote.constant.UniversalConstant;
 import com.sakura.passage_creator.rednote.workflow.state.RednoteWorkflowState;
@@ -34,16 +35,18 @@ public class RednoteSearchAgent {
             
             规则：
             1. 必须优先调用 rednote_web_search，搜索 query 直接来自用户 content，可适当补充“小红书 爆款 经验 攻略”等检索词。
-            2. 你不是最终文案 Agent，不要输出完整小红书正文。
-            3. subject 是核心主体、产品或场景。
-            4. context 要整合用户需求、网页搜索摘要、受众痛点、可用卖点和创作角度。
-            5. contentLength 只能是 SHORT、MEDIUM、LONG；无法判断时使用 MEDIUM。
-            6. targetWordCount 按用户要求推断；无法判断时 SHORT=300、MEDIUM=600、LONG=1000。
-            7. tagCount 未指定时使用 5。
-            8. imageCount 是普通配图数量，不含封面；未指定时使用 3；最大不能超过 5。
-            9. searchResults 每条只包含 title、summary、sourceName、sourceUrl。
-            10. 如果搜索工具返回不可用或空结果，也要基于用户 content 输出 RednoteBrief，并让 searchResults 为空或记录工具返回的错误摘要。
-            11. 最终只返回 JSON，不要 Markdown，不要解释文字。
+            2. 搜索结果中如果存在高价值 sourceUrl，可以选择 1-3 个调用 rednote_url_fetch 抓取正文片段；不要抓取无关、重复或明显低质量 URL。
+            3. rednote_url_fetch 的正文只用于素材清洗和摘要，不要把原文大段塞进最终输出。
+            4. 你不是最终文案 Agent，不要输出完整小红书正文。
+            5. subject 是核心主体、产品或场景。
+            6. context 要整合用户需求、网页搜索摘要、URL 正文素材、受众痛点、可用卖点和创作角度。
+            7. contentLength 只能是 SHORT、MEDIUM、LONG；无法判断时使用 MEDIUM。
+            8. targetWordCount 按用户要求推断；无法判断时 SHORT=300、MEDIUM=600、LONG=1000。
+            9. tagCount 未指定时使用 5。
+            10. imageCount 是普通配图数量，不含封面；未指定时使用 3；最大不能超过 5。
+            11. searchResults 每条只包含 title、summary、sourceName、sourceUrl；summary 应该是搜索摘要和 URL 正文抓取结果清洗后的创作素材摘要。
+            12. 如果搜索工具或 URL 抓取工具不可用，也要基于用户 content 输出 RednoteBrief，并让 searchResults 为空或记录工具返回的错误摘要。
+            13. 最终只返回 JSON，不要 Markdown，不要解释文字。
             
             json格式参考：
             ```json
@@ -81,6 +84,7 @@ public class RednoteSearchAgent {
 
     public RednoteSearchAgent(DashScopeApi dashScopeApi,
                               RednoteWebSearchTools rednoteWebSearchTools,
+                              RednoteUrlFetchTools rednoteUrlFetchTools,
                               RednoteSearchAgentHook rednoteSearchAgentHook) {
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
@@ -98,7 +102,7 @@ public class RednoteSearchAgent {
                 .systemPrompt(SYSTEM_PROMPT)
                 .instruction("用户需求：{content}")
                 .outputType(RednoteWorkflowState.SearchResponse.class)
-                .methodTools(rednoteWebSearchTools)
+                .methodTools(rednoteWebSearchTools, rednoteUrlFetchTools)
                 // 搜索工具属于外部 I/O，使用 Alibaba 内置 ToolRetryInterceptor 做短暂重试和错误消息回传。
                 .interceptors(ToolRetryInterceptor.builder()
                         .toolName(UniversalConstant.SEARCH_TOOL_NAME)

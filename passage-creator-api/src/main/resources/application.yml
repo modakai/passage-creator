@@ -131,6 +131,12 @@ rednote:
       max-results: ${TAVILY_MAX_RESULTS:5}
       topic: ${TAVILY_TOPIC:general}
       include-answer: ${TAVILY_INCLUDE_ANSWER:false}
+      extract-api-url: ${TAVILY_EXTRACT_API_URL:https://api.tavily.com/extract}
+      extract-depth: ${TAVILY_EXTRACT_DEPTH:basic}
+      extract-format: ${TAVILY_EXTRACT_FORMAT:markdown}
+      chunks-per-source: ${TAVILY_CHUNKS_PER_SOURCE:3}
+      extract-timeout-seconds: ${TAVILY_EXTRACT_TIMEOUT_SECONDS:8.0}
+      max-extract-content-length: ${TAVILY_MAX_EXTRACT_CONTENT_LENGTH:6000}
 
 # Iconify 图标检索配置，无需 API Key。
 iconify:
