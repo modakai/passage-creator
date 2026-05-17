@@ -9,6 +9,7 @@ import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.constant.PromptConstant;
 import com.sakura.passage_creator.billing.api.AiBillingReservation;
 import com.sakura.passage_creator.billing.api.AiBillingService;
+import com.sakura.passage_creator.billing.api.AiChatBillingSupport;
 import com.sakura.passage_creator.prompt.api.PromptTemplateRenderResult;
 import com.sakura.passage_creator.prompt.api.PromptTemplateService;
 import com.sakura.passage_creator.prompt.api.PromptUsageLogService;
@@ -51,7 +52,7 @@ public class ContentGeneratorAgent {
     private final AiBillingService aiBillingService;
 
     public ContentGeneratorAgent(DashScopeApi dashScopeApi, PromptTemplateService promptTemplateService,
-            PromptUsageLogService promptUsageLogService, AiBillingService aiBillingService) {
+                                 PromptUsageLogService promptUsageLogService, AiBillingService aiBillingService) {
         this.promptTemplateService = promptTemplateService;
         this.promptUsageLogService = promptUsageLogService;
         this.aiBillingService = aiBillingService;
@@ -107,8 +108,7 @@ public class ContentGeneratorAgent {
             state.setContent(response);
             recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), true, null, startMillis);
             log.info("阶段3：生成正文完毕, taskId={}", state.getTaskId());
-        }
-        catch (RuntimeException e) {
+        } catch (RuntimeException e) {
             if (!billed) {
                 aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
             }
@@ -121,7 +121,7 @@ public class ContentGeneratorAgent {
      * 记录正文 Agent 本次调用使用的系统 Prompt 和用户 Prompt。
      */
     private void recordPromptUsage(PromptTemplateRenderResult systemPrompt, PromptTemplateRenderResult userPrompt,
-            String taskId, boolean responseOk, String errorMessage, long startMillis) {
+                                   String taskId, boolean responseOk, String errorMessage, long startMillis) {
         Integer latencyMs = Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
         promptUsageLogService.recordUsage(systemPrompt, "ContentGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
         promptUsageLogService.recordUsage(userPrompt, "ContentGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);

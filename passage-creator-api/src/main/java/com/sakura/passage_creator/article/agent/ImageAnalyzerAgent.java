@@ -13,6 +13,7 @@ import com.sakura.passage_creator.article.image.service.ImageRequirementPolicy;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
 import com.sakura.passage_creator.billing.api.AiBillingReservation;
 import com.sakura.passage_creator.billing.api.AiBillingService;
+import com.sakura.passage_creator.billing.api.AiChatBillingSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -51,7 +52,7 @@ public class ImageAnalyzerAgent {
     private final int maxSectionImages;
 
     public ImageAnalyzerAgent(DashScopeApi dashScopeApi, OpenAiImageProperties imageProperties,
-            AiBillingService aiBillingService) {
+                              AiBillingService aiBillingService) {
         this.aiBillingService = aiBillingService;
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
@@ -95,8 +96,7 @@ public class ImageAnalyzerAgent {
             aiBillingService.completeTextCall(reservation, AiChatBillingSupport.usageOf(chatResponse),
                     resolveLatency(startMillis), true, null);
             billed = true;
-        }
-        catch (RuntimeException e) {
+        } catch (RuntimeException e) {
             if (!billed) {
                 aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
             }
@@ -123,18 +123,18 @@ public class ImageAnalyzerAgent {
     private String buildPrompt(String mainTitle, String content, List<String> enabledImageMethods) {
         return """
                 你是一位专业的新媒体编辑，正在为文章生成配图需求。
-
+                
                 主标题：%s
-
+                
                 正文：
                 %s
-
+                
                 可用配图方式：
                 %s
-
+                
                 配图方式填写要求：
                 %s
-
+                
                 任务要求：
                 1. 生成 1 张封面图，position 必须为 1，type 必须为 cover，placeholderId 留空。
                 2. 最多再生成 2 张章节配图，position 从 2 开始，type 使用 section。
@@ -142,7 +142,7 @@ public class ImageAnalyzerAgent {
                 4. imageSource 必须从可用配图方式中选择，禁止输出 NANO_BANANA、PICSUM 或其他未列出的值。
                 5. GPT_IMAGE 的 prompt 必须使用英文，适合直接交给 gpt-image-2 生成，避免水印、避免侵权角色、避免过多文字。
                 6. contentWithPlaceholders 必须保留原正文内容，只添加图片占位符。
-
+                
                 输出格式要求：
                 """
                 .formatted(mainTitle, content,
@@ -213,7 +213,8 @@ public class ImageAnalyzerAgent {
             case MERMAID -> "- MERMAID: prompt 必填，只填写 Mermaid 代码，例如 flowchart TD；keywords 填流程主题。";
             case ICONIFY -> "- ICONIFY: keywords 必填，使用英文名词，例如 productivity、database、calendar；prompt 可留空。";
             case SVG_DIAGRAM -> "- SVG_DIAGRAM: prompt 必填，描述概念图结构、节点、关系和视觉风格；keywords 可填主题词。";
-            case GPT_IMAGE -> "- GPT_IMAGE: prompt 必填，使用详细英文提示词，描述画面主体、风格、构图、色彩和用途；keywords 可留空。";
+            case GPT_IMAGE ->
+                    "- GPT_IMAGE: prompt 必填，使用详细英文提示词，描述画面主体、风格、构图、色彩和用途；keywords 可留空。";
             case PICSUM -> "";
         };
     }
@@ -224,8 +225,7 @@ public class ImageAnalyzerAgent {
     private ArticleState.Agent4Result parseResult(String response) {
         try {
             return outputConverter.convert(response);
-        }
-        catch (RuntimeException e) {
+        } catch (RuntimeException e) {
             log.warn("阶段4：结构化配图需求解析失败，尝试使用 JSON 兜底解析", e);
             String jsonText = stripMarkdownFence(response);
             return JSONUtil.toBean(jsonText, ArticleState.Agent4Result.class);

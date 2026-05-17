@@ -1,6 +1,5 @@
-package com.sakura.passage_creator.article.agent;
+package com.sakura.passage_creator.billing.api;
 
-import com.sakura.passage_creator.billing.api.AiTokenUsageSnapshot;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 

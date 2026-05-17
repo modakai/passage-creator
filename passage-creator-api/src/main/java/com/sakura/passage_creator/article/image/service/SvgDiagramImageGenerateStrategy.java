@@ -5,12 +5,12 @@ import com.alibaba.cloud.ai.dashscope.api.DashScopeApi;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatModel;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
-import com.sakura.passage_creator.article.agent.AiChatBillingSupport;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.model.dto.image.ImageData;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
 import com.sakura.passage_creator.billing.api.AiBillingReservation;
 import com.sakura.passage_creator.billing.api.AiBillingService;
+import com.sakura.passage_creator.billing.api.AiChatBillingSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -87,8 +87,7 @@ public class SvgDiagramImageGenerateStrategy implements ImageGenerateStrategy {
                     resolveLatency(startMillis), true, null);
             billed = true;
             return buildResult(requirement, AiChatBillingSupport.contentOf(chatResponse));
-        }
-        catch (RuntimeException e) {
+        } catch (RuntimeException e) {
             if (!billed) {
                 aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
             }
@@ -126,10 +125,10 @@ public class SvgDiagramImageGenerateStrategy implements ImageGenerateStrategy {
     private String buildPrompt(String requirementText) {
         return """
                 你是资深信息图设计师。请根据需求生成一张可直接保存的 SVG 概念示意图。
-
+                
                 需求：
                 %s
-
+                
                 强约束：
                 1. 只输出完整 <svg>...</svg>，不要解释，不要 Markdown 代码块。
                 2. 使用 1200x800 画布，风格简洁、清晰、适合公众号文章。

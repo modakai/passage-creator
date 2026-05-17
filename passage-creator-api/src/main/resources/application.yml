@@ -121,6 +121,17 @@ pexels:
   per-page: ${PEXELS_PER_PAGE:5}
   orientation: ${PEXELS_ORIENTATION:landscape}
 
+# 小红书 SearchAgent 搜索工具配置。未配置 Tavily API Key 时会基于用户输入降级生成简报。
+rednote:
+  search:
+    tavily:
+      api-key: ${TAVILY_API_KEY:}
+      api-url: ${TAVILY_API_URL:https://api.tavily.com/search}
+      search-depth: ${TAVILY_SEARCH_DEPTH:basic}
+      max-results: ${TAVILY_MAX_RESULTS:5}
+      topic: ${TAVILY_TOPIC:general}
+      include-answer: ${TAVILY_INCLUDE_ANSWER:false}
+
 # Iconify 图标检索配置，无需 API Key。
 iconify:
   api-url: ${ICONIFY_API_URL:https://api.iconify.design}

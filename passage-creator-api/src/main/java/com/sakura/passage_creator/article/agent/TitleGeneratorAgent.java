@@ -10,6 +10,7 @@ import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.constant.PromptConstant;
 import com.sakura.passage_creator.billing.api.AiBillingReservation;
 import com.sakura.passage_creator.billing.api.AiBillingService;
+import com.sakura.passage_creator.billing.api.AiChatBillingSupport;
 import com.sakura.passage_creator.prompt.api.PromptTemplateRenderResult;
 import com.sakura.passage_creator.prompt.api.PromptTemplateService;
 import com.sakura.passage_creator.prompt.api.PromptUsageLogService;
@@ -50,7 +51,7 @@ public class TitleGeneratorAgent {
     private final PromptUsageLogService promptUsageLogService;
 
     public TitleGeneratorAgent(DashScopeApi dashScopeApi, PromptTemplateService promptTemplateService,
-            PromptUsageLogService promptUsageLogService, AiBillingService aiBillingService) {
+                               PromptUsageLogService promptUsageLogService, AiBillingService aiBillingService) {
         this.promptTemplateService = promptTemplateService;
         this.promptUsageLogService = promptUsageLogService;
         this.aiBillingService = aiBillingService;
@@ -107,8 +108,7 @@ public class TitleGeneratorAgent {
             state.setTitleOptions(optionList);
             recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), true, null, startMillis);
             log.info("阶段1：生成标题方案完毕，taskId={}", state.getTaskId());
-        }
-        catch (RuntimeException e) {
+        } catch (RuntimeException e) {
             if (!billed) {
                 aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
             }
@@ -121,7 +121,7 @@ public class TitleGeneratorAgent {
      * 记录标题 Agent 本次调用使用的系统 Prompt 和用户 Prompt。
      */
     private void recordPromptUsage(PromptTemplateRenderResult systemPrompt, PromptTemplateRenderResult userPrompt,
-            String taskId, boolean responseOk, String errorMessage, long startMillis) {
+                                   String taskId, boolean responseOk, String errorMessage, long startMillis) {
         Integer latencyMs = Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
         promptUsageLogService.recordUsage(systemPrompt, "TitleGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
         promptUsageLogService.recordUsage(userPrompt, "TitleGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);

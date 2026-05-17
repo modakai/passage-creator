@@ -1,11 +1,14 @@
 package com.sakura.passage_creator.rednote.workflow;
 
+import lombok.Getter;
+
 /**
  * 小红书爆文创作 workflow node 类型
  *
  * @author sakura
  * @create 2026-05
  */
+@Getter
 public enum RednoteWorkflowNodeType {
 
     // 节点1：根据用户输入的词，去搜索网页搜索对应的内容
@@ -17,6 +20,9 @@ public enum RednoteWorkflowNodeType {
     // 节点4：并行生成图片
     IMAGE_GENERATING("IMAGE_GENERATING");
 
+    /**
+     * StateGraph 持久化节点值。
+     */
     private final String value;
 
     RednoteWorkflowNodeType(String value) {

@@ -10,6 +10,7 @@ import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.constant.PromptConstant;
 import com.sakura.passage_creator.billing.api.AiBillingReservation;
 import com.sakura.passage_creator.billing.api.AiBillingService;
+import com.sakura.passage_creator.billing.api.AiChatBillingSupport;
 import com.sakura.passage_creator.prompt.api.PromptTemplateRenderResult;
 import com.sakura.passage_creator.prompt.api.PromptTemplateService;
 import com.sakura.passage_creator.prompt.api.PromptUsageLogService;
@@ -56,7 +57,7 @@ public class OutlineGeneratorAgent {
             new BeanOutputConverter<>(ArticleState.OutlineResult.class);
 
     public OutlineGeneratorAgent(DashScopeApi dashScopeApi, PromptTemplateService promptTemplateService,
-            PromptUsageLogService promptUsageLogService, AiBillingService aiBillingService) {
+                                 PromptUsageLogService promptUsageLogService, AiBillingService aiBillingService) {
         this.promptTemplateService = promptTemplateService;
         this.promptUsageLogService = promptUsageLogService;
         this.aiBillingService = aiBillingService;
@@ -120,8 +121,7 @@ public class OutlineGeneratorAgent {
             state.setOutline(optionList);
             recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), true, null, startMillis);
             log.info("阶段2：生成大纲完毕，taskId={}", state.getTaskId());
-        }
-        catch (RuntimeException e) {
+        } catch (RuntimeException e) {
             if (!billed) {
                 aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
             }
@@ -138,8 +138,7 @@ public class OutlineGeneratorAgent {
             ArticleState.OutlineResult outline = outlineOutputConverter.convert(response);
             OutlineJsonParser.validateOutline(outline);
             return outline;
-        }
-        catch (RuntimeException e) {
+        } catch (RuntimeException e) {
             log.warn("阶段2：结构化输出解析失败，尝试使用本地 JSON 修复兜底", e);
             return OutlineJsonParser.parse(response);
         }
@@ -149,7 +148,7 @@ public class OutlineGeneratorAgent {
      * 记录大纲 Agent 本次调用使用的系统 Prompt 和用户 Prompt。
      */
     private void recordPromptUsage(PromptTemplateRenderResult systemPrompt, PromptTemplateRenderResult userPrompt,
-            String taskId, boolean responseOk, String errorMessage, long startMillis) {
+                                   String taskId, boolean responseOk, String errorMessage, long startMillis) {
         Integer latencyMs = Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
         promptUsageLogService.recordUsage(systemPrompt, "OutlineGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
         promptUsageLogService.recordUsage(userPrompt, "OutlineGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
