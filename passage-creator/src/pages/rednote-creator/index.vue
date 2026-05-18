@@ -186,6 +186,7 @@ function applyNote(note: AppRednoteItem) {
     if (note.status === 'COMPLETED') {
       forgetActiveTask()
     }
+    void loadRecentNotes()
   }
 }
 
@@ -465,7 +466,6 @@ async function handleCreate() {
     }
     startRealtime(response.data)
     toast.success('小红书任务已创建')
-    await loadRecentNotes()
   }
   catch (error) {
     toast.error(error instanceof Error ? error.message : '创建小红书任务失败')

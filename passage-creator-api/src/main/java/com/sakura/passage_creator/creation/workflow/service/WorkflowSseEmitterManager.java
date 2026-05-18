@@ -79,10 +79,13 @@ public class WorkflowSseEmitterManager {
         }
 
         try {
-            emitter.send(SseEmitter.event()
-                    .name("message")
-                    .data(message)
-                    .reconnectTime(SSE_RECONNECT_TIME_MS));
+            // 同一个 emitter 可能被 controller 初始快照和 workflow 异步线程同时写入，必须串行化响应流写操作。
+            synchronized (emitter) {
+                emitter.send(SseEmitter.event()
+                        .name("message")
+                        .data(message)
+                        .reconnectTime(SSE_RECONNECT_TIME_MS));
+            }
             log.debug("workflow SSE 消息发送成功, taskId={}, message={}", taskId, message);
         } catch (Exception e) {
             emitterMap.remove(taskId, emitter);
@@ -106,7 +109,10 @@ public class WorkflowSseEmitterManager {
         }
 
         try {
-            emitter.complete();
+            // complete 与 send 共享同一把锁，避免关闭响应时另一个线程还在写入。
+            synchronized (emitter) {
+                emitter.complete();
+            }
             log.debug("workflow SSE 连接已完成, taskId={}", taskId);
         } catch (Exception e) {
             log.debug("workflow SSE 连接关闭失败, taskId={}, reason={}", taskId, e.getMessage());
@@ -142,7 +148,9 @@ public class WorkflowSseEmitterManager {
      */
     private void safeComplete(SseEmitter emitter) {
         try {
-            emitter.complete();
+            synchronized (emitter) {
+                emitter.complete();
+            }
         } catch (Exception ignored) {
             // 客户端断开时 complete 可能再次触发容器异常，忽略即可。
         }

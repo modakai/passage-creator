@@ -890,11 +890,22 @@ async function handleConfirmOutline() {
   }
 }
 
+/**
+ * 浏览器刷新、关闭标签页或进入 bfcache 前同步断开文章 SSE。
+ */
+function handleArticlePageExit() {
+  closeCurrentSse()
+}
+
 onUnmounted(() => {
+  window.removeEventListener('pagehide', handleArticlePageExit)
+  window.removeEventListener('beforeunload', handleArticlePageExit)
   closeCurrentSse()
 })
 
 onMounted(() => {
+  window.addEventListener('pagehide', handleArticlePageExit)
+  window.addEventListener('beforeunload', handleArticlePageExit)
   // 首页带 topic 进入时优先展示新建表单，避免本地缓存覆盖用户这次的新选题。
   const resumeTaskId = initialTaskId || (typeof initialTopic === 'string' ? '' : readActiveArticleTaskId())
   if (!resumeTaskId) {

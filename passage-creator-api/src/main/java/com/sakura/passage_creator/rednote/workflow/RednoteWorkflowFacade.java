@@ -36,19 +36,19 @@ public class RednoteWorkflowFacade {
     private final RednoteWorkflowGraphFactory graphFactory;
     private final WorkflowTaskStore workflowTaskStore;
     private final WorkflowEventPublisher eventPublisher;
-    private final Executor articleExecutor;
+    private final Executor rednoteExecutor;
 
     public RednoteWorkflowFacade(RednoteNotePersistenceService rednoteNoteService,
             RednoteWorkflowGraphFactory graphFactory,
             WorkflowTaskStore workflowTaskStore,
             WorkflowEventPublisher eventPublisher,
-            @Qualifier("articleExecutor") Executor articleExecutor) {
+            @Qualifier("rednoteExecutor") Executor rednoteExecutor) {
         this.rednoteNoteService = rednoteNoteService;
         this.graphFactory = graphFactory;
         this.workflowTaskStore = workflowTaskStore;
         this.eventPublisher = eventPublisher;
-        // 复用现有 AI 任务线程池，避免 rednote MVP 再引入一套线程配置。
-        this.articleExecutor = articleExecutor;
+        // Rednote workflow 使用独立线程池，避免和文章任务互相挤占队列。
+        this.rednoteExecutor = rednoteExecutor;
     }
 
     /**
@@ -105,9 +105,9 @@ public class RednoteWorkflowFacade {
     }
 
     private void submitRun(String taskId, boolean resume) {
-        articleExecutor.execute(() -> {
+        rednoteExecutor.execute(() -> {
             try {
-                // Spring @Async 无法直接包住 private 方法，这里显式交给 AI 任务线程池执行。
+                // Spring @Async 无法直接包住 private 方法，这里显式交给 rednote 任务线程池执行。
                 runGraph(taskId, resume);
             } catch (RuntimeException e) {
                 log.error("小红书 workflow 执行失败, taskId={}", taskId, e);

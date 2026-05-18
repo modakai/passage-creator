@@ -23,7 +23,7 @@
         <spring-modulith.version>1.4.10</spring-modulith.version>
         <oshi.version>6.10.0</oshi.version>
         <mapstruct-plus.version>1.4.8</mapstruct-plus.version>
-        <spring-ai-alibaba.version>1.1.2.0</spring-ai-alibaba.version>
+        <spring-ai-alibaba.version>1.1.2.3</spring-ai-alibaba.version>
     </properties>
 
     <dependencyManagement>
