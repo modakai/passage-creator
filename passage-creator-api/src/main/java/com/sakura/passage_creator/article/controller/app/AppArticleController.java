@@ -3,14 +3,14 @@ package com.sakura.passage_creator.article.controller.app;
 import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
-import com.sakura.passage_creator.article.image.service.RemoteImageDownloader;
-import com.sakura.passage_creator.article.manager.SseEmitterManager;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowRemoteImageDownloader;
+import com.sakura.passage_creator.creation.workflow.service.WorkflowSseEmitterManager;
 import com.sakura.passage_creator.article.model.dto.ArticleConfirmOutlineRequest;
 import com.sakura.passage_creator.article.model.dto.ArticleConfirmTitleRequest;
 import com.sakura.passage_creator.article.model.dto.ArticleCreateRequest;
 import com.sakura.passage_creator.article.model.dto.ArticleQueryRequest;
 import com.sakura.passage_creator.article.model.dto.SseMessage;
-import com.sakura.passage_creator.article.model.dto.image.ImageData;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowImageData;
 import com.sakura.passage_creator.article.model.entity.Article;
 import com.sakura.passage_creator.article.model.enums.SseMessageTypeEnum;
 import com.sakura.passage_creator.article.model.vo.ArticleVO;
@@ -58,9 +58,9 @@ public class AppArticleController {
 
     private final ArticleService articleService;
 
-    private final SseEmitterManager sseEmitterManager;
+    private final WorkflowSseEmitterManager sseEmitterManager;
 
-    private final RemoteImageDownloader remoteImageDownloader;
+    private final WorkflowRemoteImageDownloader remoteImageDownloader;
 
     /**
      * 创建文章任务，启动标题生成异步任务，返回 taskId
@@ -113,7 +113,7 @@ public class AppArticleController {
         Article article = articleService.getOwnedArticleByTaskId(taskId, LoginUserContext.getLoginUser());
         assertImageBelongsToArticle(article, imageUrl);
 
-        ImageData imageData = remoteImageDownloader.download(imageUrl);
+        WorkflowImageData imageData = remoteImageDownloader.download(imageUrl);
         String fileName = "article-%s-image%s".formatted(taskId, imageData.getExtension());
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()

@@ -54,8 +54,15 @@ public final class RednoteSearchResponseSupport {
      */
     public static RednoteWorkflowState.SearchResponse parseAndNormalize(String response, String content) {
         RednoteWorkflowState.SearchResponse brief = parseResponse(response);
-        normalizeBrief(brief, content);
+        normalize(brief, content);
         return brief;
+    }
+
+    /**
+     * 清洗已结构化的 SearchAgent 输出，供 Hook 直接读取 outputKey 时复用。
+     */
+    public static void normalize(RednoteWorkflowState.SearchResponse brief, String content) {
+        normalizeBrief(brief, content);
     }
 
     /**
@@ -68,10 +75,12 @@ public final class RednoteSearchResponseSupport {
         updates.put(RednoteWorkflowState.KEY_CONTEXT, searchResponse.getContext());
         updates.put(RednoteWorkflowState.KEY_CONTENT_LENGTH, searchResponse.getContentLength());
         updates.put(RednoteWorkflowState.KEY_TARGET_WORD_COUNT, searchResponse.getTargetWordCount());
-        updates.put(RednoteWorkflowState.KEY_KEYWORDS, searchResponse.getKeywords());
+        // Agent 模板渲染器需要可直接替换的标量值，集合字段统一转成 JSON 字符串。
+        updates.put(RednoteWorkflowState.KEY_KEYWORDS, JSONUtil.toJsonStr(searchResponse.getKeywords()));
         updates.put(RednoteWorkflowState.KEY_TAG_COUNT, searchResponse.getTagCount());
         updates.put(RednoteWorkflowState.KEY_IMAGE_COUNT, searchResponse.getImageCount());
-        updates.put(RednoteWorkflowState.KEY_SEARCH_RESULTS, searchResponse.getSearchResults());
+        // 搜索结果包含 URL、摘要等复杂对象，作为 JSON 字符串传给文案 Agent 更稳定。
+        updates.put(RednoteWorkflowState.KEY_SEARCH_RESULTS, JSONUtil.toJsonStr(searchResponse.getSearchResults()));
         return updates;
     }
 

@@ -15,10 +15,12 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Redis checkpoint saver，让 Spring AI Alibaba StateGraph 的中断点可跨服务重启恢复。
@@ -30,6 +32,16 @@ public class RedisWorkflowCheckpointSaver implements BaseCheckpointSaver {
     private static final String KEY_PREFIX = "creation:workflow:checkpoint:";
     private static final TypeReference<List<CheckpointRecord>> CHECKPOINT_RECORD_LIST_TYPE = new TypeReference<>() {
     };
+    private static final Set<String> TRANSIENT_STATE_KEYS = Set.of(
+            "messages",
+            "_TOKEN_USAGE_",
+            // 以下是 Agent 原始 outputKey，运行时可能保存 GraphResponse/AssistantMessage，不适合跨进程恢复。
+            "brief",
+            "searchResponse",
+            "copywriting",
+            "normalImagePromptResponse",
+            "coverImagePromptResponse"
+    );
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -102,7 +114,7 @@ public class RedisWorkflowCheckpointSaver implements BaseCheckpointSaver {
 
     private void saveCheckpoints(String threadId, LinkedList<Checkpoint> checkpoints) {
         List<CheckpointRecord> records = checkpoints.stream()
-                .map(CheckpointRecord::fromCheckpoint)
+                .map(checkpoint -> CheckpointRecord.fromCheckpoint(checkpoint, objectMapper))
                 .toList();
         try {
             // 使用专用 JSON 字符串保存 checkpoint，避免全局 RedisTemplate 的 default typing 影响 Graph 恢复。
@@ -157,14 +169,68 @@ public class RedisWorkflowCheckpointSaver implements BaseCheckpointSaver {
         private String nodeId;
         private String nextNodeId;
 
-        static CheckpointRecord fromCheckpoint(Checkpoint checkpoint) {
+        static CheckpointRecord fromCheckpoint(Checkpoint checkpoint, ObjectMapper objectMapper) {
             CheckpointRecord record = new CheckpointRecord();
             record.setId(checkpoint.getId());
-            record.setState(checkpoint.getState());
+            // Agent messages/token usage 属于框架运行态，JSON 恢复后会变成 Map 并破坏 AgentLlmNode 类型假设。
+            record.setState(sanitizeState(checkpoint.getState(), objectMapper));
             record.setNodeId(checkpoint.getNodeId());
             record.setNextNodeId(checkpoint.getNextNodeId());
             return record;
         }
+
+        private static Map<String, Object> sanitizeState(Map<String, Object> state, ObjectMapper objectMapper) {
+            Map<String, Object> sanitizedState = new LinkedHashMap<>();
+            if (state == null || state.isEmpty()) {
+                return sanitizedState;
+            }
+            for (Map.Entry<String, Object> entry : state.entrySet()) {
+                if (TRANSIENT_STATE_KEYS.contains(entry.getKey())) {
+                    continue;
+                }
+                Object value = sanitizeValue(entry.getValue(), objectMapper);
+                if (value != null) {
+                    sanitizedState.put(entry.getKey(), value);
+                }
+            }
+            return sanitizedState;
+        }
+
+        /**
+         * 将 checkpoint state 转成 JSON 安全值，过滤 GraphResponse 等框架运行态对象。
+         */
+        @SuppressWarnings("unchecked")
+        private static Object sanitizeValue(Object value, ObjectMapper objectMapper) {
+            if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) {
+                return value;
+            }
+            if (value instanceof Map<?, ?> map) {
+                Map<String, Object> sanitizedMap = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    Object sanitizedValue = sanitizeValue(entry.getValue(), objectMapper);
+                    if (entry.getKey() != null && sanitizedValue != null) {
+                        sanitizedMap.put(entry.getKey().toString(), sanitizedValue);
+                    }
+                }
+                return sanitizedMap;
+            }
+            if (value instanceof Iterable<?> iterable) {
+                return java.util.stream.StreamSupport.stream(iterable.spliterator(), false)
+                        .map(item -> sanitizeValue(item, objectMapper))
+                        .filter(item -> item != null)
+                        .toList();
+            }
+            if (value.getClass().getName().startsWith("com.alibaba.cloud.ai.graph.")
+                    || value.getClass().getName().startsWith("org.springframework.ai.chat.messages.")) {
+                return null;
+            }
+            try {
+                return objectMapper.convertValue(value, Object.class);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }
+
         Checkpoint toCheckpoint() {
             return Checkpoint.builder()
                     .id(id)

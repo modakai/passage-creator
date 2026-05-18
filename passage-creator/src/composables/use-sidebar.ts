@@ -1,4 +1,4 @@
-import { ActivityIcon, BellDotIcon, BotIcon, CreditCardIcon, FileCode2Icon, FileTextIcon, LayoutDashboardIcon, MessageSquareTextIcon, PaletteIcon, ScrollTextIcon, SettingsIcon, ShieldAlertIcon, SlidersHorizontalIcon, SparklesIcon, UserIcon, UsersIcon, WrenchIcon } from '@lucide/vue'
+import { ActivityIcon, BellDotIcon, BookOpenTextIcon, BotIcon, CreditCardIcon, FileCode2Icon, FileTextIcon, LayoutDashboardIcon, MessageSquareTextIcon, PaletteIcon, ScrollTextIcon, SettingsIcon, ShieldAlertIcon, SlidersHorizontalIcon, SparklesIcon, UserIcon, UsersIcon, WrenchIcon } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
 
 import type { NavGroup } from '@/components/app-sidebar/types'
@@ -41,6 +41,12 @@ export function buildAdminNavGroups(t: (key: string) => string): NavGroup[] {
           title: 'AI 爆款文章',
           url: '/article-creator',
           icon: SparklesIcon,
+        },
+        {
+          id: 'rednote-creator',
+          title: '小红书爆款创作',
+          url: '/rednote-creator',
+          icon: BookOpenTextIcon,
         },
         {
           id: 'system',

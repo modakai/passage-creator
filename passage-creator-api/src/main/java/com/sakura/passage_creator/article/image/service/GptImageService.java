@@ -3,10 +3,11 @@ package com.sakura.passage_creator.article.image.service;
 import cn.hutool.core.util.StrUtil;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.config.OpenAiImageProperties;
-import com.sakura.passage_creator.article.model.dto.image.ImageData;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
 import com.sakura.passage_creator.billing.api.AiBillingReservation;
 import com.sakura.passage_creator.billing.api.AiBillingService;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowImageData;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowRemoteImageDownloader;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -35,7 +36,7 @@ public class GptImageService implements ImageGenerateStrategy {
     /**
      * 远程图片下载器，用于处理中转站返回 URL 的场景。
      */
-    private final RemoteImageDownloader remoteImageDownloader;
+    private final WorkflowRemoteImageDownloader remoteImageDownloader;
 
     /**
      * Spring REST 客户端。
@@ -48,7 +49,7 @@ public class GptImageService implements ImageGenerateStrategy {
     private final AiBillingService aiBillingService;
 
     public GptImageService(OpenAiImageProperties properties, OpenAiImageResponseParser responseParser,
-            RemoteImageDownloader remoteImageDownloader, AiBillingService aiBillingService) {
+            WorkflowRemoteImageDownloader remoteImageDownloader, AiBillingService aiBillingService) {
         this.properties = properties;
         this.responseParser = responseParser;
         this.remoteImageDownloader = remoteImageDownloader;
@@ -62,7 +63,7 @@ public class GptImageService implements ImageGenerateStrategy {
      * @param requirement 配图需求
      * @return 图片二进制数据
      */
-    public ImageData generateImage(ArticleState.ImageRequirement requirement) {
+    public WorkflowImageData generateImage(ArticleState.ImageRequirement requirement) {
         validateConfig();
         String prompt = buildPrompt(requirement);
         Map<String, Object> requestBody = buildRequestBody(prompt);

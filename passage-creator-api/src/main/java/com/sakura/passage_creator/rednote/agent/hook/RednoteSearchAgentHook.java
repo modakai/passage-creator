@@ -68,7 +68,7 @@ public class RednoteSearchAgentHook extends AgentHook {
 
         RednoteNote note = getNoteByTaskId(taskId);
 
-        RednoteWorkflowState.SearchResponse searchResponse = RednoteSearchResponseSupport.parseAndNormalize(latestAssistantText(state), content);
+        RednoteWorkflowState.SearchResponse searchResponse = resolveSearchResponse(state, content);
 
         note.setSubject(searchResponse.getSubject());
         note.setContext(searchResponse.getContext());
@@ -84,6 +84,22 @@ public class RednoteSearchAgentHook extends AgentHook {
         rednoteNoteMapper.update(note);
 
         return CompletableFuture.completedFuture(RednoteSearchResponseSupport.toStateUpdates(searchResponse));
+    }
+
+    /**
+     * 优先读取 Agent outputKey，避免依赖 messages 这类框架运行态字段。
+     */
+    private RednoteWorkflowState.SearchResponse resolveSearchResponse(OverAllState state, String content) {
+        Object outputValue = state.value(RednoteWorkflowState.SEARCH_OUTPUT_KEY).orElse(null);
+        if (outputValue instanceof RednoteWorkflowState.SearchResponse searchResponse) {
+            RednoteSearchResponseSupport.normalize(searchResponse, content);
+            return searchResponse;
+        }
+        String outputText = assistantText(outputValue);
+        if (StringUtils.isNotBlank(outputText)) {
+            return RednoteSearchResponseSupport.parseAndNormalize(outputText, content);
+        }
+        return RednoteSearchResponseSupport.parseAndNormalize(latestAssistantText(state), content);
     }
 
     /**
@@ -104,12 +120,32 @@ public class RednoteSearchAgentHook extends AgentHook {
             throw new IllegalStateException("SearchAgent messages 类型不正确");
         }
         for (int index = messages.size() - 1; index >= 0; index--) {
-            Message message = (Message) messages.get(index);
-            if (message instanceof AssistantMessage assistantMessage && StringUtils.isNotBlank(assistantMessage.getText())) {
-                return assistantMessage.getText();
+            String assistantText = assistantText(messages.get(index));
+            if (StringUtils.isNotBlank(assistantText)) {
+                return assistantText;
             }
         }
         throw new IllegalStateException("SearchAgent 未返回 AssistantMessage");
+    }
+
+    /**
+     * 兼容 AssistantMessage 以及旧 checkpoint 反序列化后的 Map 文本结构。
+     */
+    private String assistantText(Object value) {
+        if (value instanceof AssistantMessage assistantMessage) {
+            return assistantMessage.getText();
+        }
+        if (value instanceof Message message) {
+            return message.getText();
+        }
+        if (value instanceof Map<?, ?> map) {
+            Object text = map.get("text");
+            if (text == null) {
+                text = map.get("content");
+            }
+            return text == null ? null : text.toString();
+        }
+        return value instanceof String text ? text : null;
     }
 
     /**

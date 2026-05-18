@@ -1,4 +1,4 @@
-package com.sakura.passage_creator.article.model.dto.image;
+package com.sakura.passage_creator.creation.workflow.image;
 
 import lombok.Builder;
 import lombok.Data;
@@ -7,11 +7,11 @@ import java.io.Serial;
 import java.io.Serializable;
 
 /**
- * 图片二进制数据，作为图片生成服务和存储服务之间的边界对象。
+ * workflow 通用图片二进制数据，作为图片生成服务和存储服务之间的边界对象。
  */
 @Data
 @Builder
-public class ImageData implements Serializable {
+public class WorkflowImageData implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;

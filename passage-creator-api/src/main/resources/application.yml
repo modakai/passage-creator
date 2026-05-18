@@ -9,7 +9,7 @@ server:
     enabled: true
 spring:
   application:
-    name: sakura-boot-init-api
+    name: passage-creator-api
   modulith:
     # 仅把显式标注 @ApplicationModule 的包纳入模块图，避免普通目录被误识别为应用模块。
     detection-strategy: explicitly-annotated

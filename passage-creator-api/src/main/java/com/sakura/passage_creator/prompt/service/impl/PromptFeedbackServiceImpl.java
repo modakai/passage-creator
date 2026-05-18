@@ -3,7 +3,6 @@ package com.sakura.passage_creator.prompt.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
-import com.sakura.passage_creator.article.service.ArticleService;
 import com.sakura.passage_creator.prompt.api.PromptUsageLogService;
 import com.sakura.passage_creator.prompt.model.dto.PromptFeedbackQueryRequest;
 import com.sakura.passage_creator.prompt.model.dto.PromptFeedbackSubmitRequest;
@@ -61,25 +60,19 @@ public class PromptFeedbackServiceImpl extends ServiceImpl<PromptFeedbackMapper,
     private static final int MAX_REMARK_LENGTH = 1000;
 
     /**
-     * 文章服务，用于校验用户端任务归属。
-     */
-    private final ArticleService articleService;
-
-    /**
      * Prompt 使用日志服务，用于关联模板版本快照。
      */
     private final PromptUsageLogService promptUsageLogService;
 
-    public PromptFeedbackServiceImpl(ArticleService articleService, PromptUsageLogService promptUsageLogService) {
-        this.articleService = articleService;
+    public PromptFeedbackServiceImpl(PromptUsageLogService promptUsageLogService) {
         this.promptUsageLogService = promptUsageLogService;
     }
 
     @Override
     public PromptFeedbackVO submitFeedback(PromptFeedbackSubmitRequest request, LoginUserInfo loginUser) {
         validateSubmitRequest(request, loginUser);
-        // 用户端反馈必须绑定本人任务，管理员在前台也不能替他人提交反馈。
-        articleService.getOwnedArticleByTaskId(request.getTaskId(), loginUser);
+        PromptUsageLog usageLog = findMatchedUsageLog(request.getTaskId(), request.getFeedbackStage());
+        assertUsageLogBelongsToUser(usageLog, loginUser);
 
         LocalDateTime now = LocalDateTime.now();
         PromptFeedback existing = findFeedback(loginUser.userId(), request.getTaskId(), request.getFeedbackStage());
@@ -96,7 +89,7 @@ public class PromptFeedbackServiceImpl extends ServiceImpl<PromptFeedbackMapper,
         if (feedback.getIsDelete() == null) {
             feedback.setIsDelete(0);
         }
-        fillPromptSnapshot(feedback, findMatchedUsageLog(request.getTaskId(), request.getFeedbackStage()));
+        fillPromptSnapshot(feedback, usageLog);
 
         boolean result = existing == null ? saveFeedback(feedback) : updateFeedback(feedback);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "反馈保存失败");
@@ -233,6 +226,16 @@ public class PromptFeedbackServiceImpl extends ServiceImpl<PromptFeedbackMapper,
                 "反馈满意度非法");
         ThrowUtils.throwIf(StringUtils.length(request.getRemark()) > MAX_REMARK_LENGTH, ErrorCode.PARAMS_ERROR,
                 "反馈说明不能超过 1000 个字符");
+    }
+
+    /**
+     * 用户端反馈以 Prompt 使用日志为归属凭证，避免 Prompt 模块反向依赖文章模块。
+     */
+    private void assertUsageLogBelongsToUser(PromptUsageLog usageLog, LoginUserInfo loginUser) {
+        ThrowUtils.throwIf(usageLog == null || usageLog.getUserId() == null, ErrorCode.NOT_FOUND_ERROR,
+                "未找到可反馈的 Prompt 使用记录");
+        ThrowUtils.throwIf(!loginUser.userId().equals(usageLog.getUserId()), ErrorCode.NO_AUTH_ERROR,
+                "不能提交他人任务的 Prompt 反馈");
     }
 
     /**

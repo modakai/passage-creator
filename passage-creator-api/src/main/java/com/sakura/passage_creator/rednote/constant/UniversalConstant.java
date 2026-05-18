@@ -16,4 +16,8 @@ public interface UniversalConstant {
 
     String REDNOTE_CONTENT_AGENT_NAME = "RednoteContentAgent";
 
+    String REDNOTE_NORMAL_IMAGE_PROMPT_AGENT_NAME = "RednoteNormalImagePromptAgent";
+
+    String REDNOTE_COVER_IMAGE_PROMPT_AGENT_NAME = "RednoteCoverImagePromptAgent";
+
 }

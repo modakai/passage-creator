@@ -103,9 +103,24 @@ public class RednoteWorkflowState {
     public static final String KEY_IMAGE_PROMPTS = "imagePrompts";
 
     /**
+     * 普通配图提示词 Agent 原始结构化输出状态键。
+     */
+    public static final String KEY_NORMAL_IMAGE_PROMPT_RESPONSE = "normalImagePromptResponse";
+
+    /**
+     * 封面图提示词 Agent 原始结构化输出状态键。
+     */
+    public static final String KEY_COVER_IMAGE_PROMPT_RESPONSE = "coverImagePromptResponse";
+
+    /**
      * 普通配图结果状态键。
      */
     public static final String KEY_IMAGES = "images";
+
+    /**
+     * 封面图生成结果状态键。
+     */
+    public static final String KEY_COVER_IMAGE_RESULT = "coverImageResult";
 
     /**
      * 封面图结果状态键。
@@ -290,5 +305,130 @@ public class RednoteWorkflowState {
          * 普通配图提示词 JSON 文本。
          */
         private String imagePrompts;
+    }
+
+    /**
+     * 普通图片提示词 Agent 输出结构。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class NormalImagePromptResponse implements Serializable {
+
+        /**
+         * 普通配图提示词列表，最多 5 条。
+         */
+        private List<ImagePromptItem> imagePrompts;
+    }
+
+    /**
+     * 单张普通配图的提示词计划。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ImagePromptItem implements Serializable {
+
+        /**
+         * 图片顺序，从 1 开始。
+         */
+        private Integer position;
+
+        /**
+         * 图片用途说明，例如“步骤图”“氛围图”。
+         */
+        private String purpose;
+
+        /**
+         * 最终用于图片生成的主提示词。
+         */
+        private String prompt;
+
+        /**
+         * 轻微差异化的备选提示词。
+         */
+        private List<String> variants;
+    }
+
+    /**
+     * 封面图提示词 Agent 输出结构。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CoverImagePromptResponse implements Serializable {
+
+        /**
+         * 封面图主标题，严格不超过 12 个字。
+         */
+        private String title;
+
+        /**
+         * 封面图副标题，控制在 10-20 个字。
+         */
+        private String subtitle;
+
+        /**
+         * 封面图点缀文案，控制在 10-20 个字。
+         */
+        private String decorativeText;
+
+        /**
+         * 封面图相关标签，通常为 4-5 个。
+         */
+        private List<String> tags;
+
+        /**
+         * 最终用于生成封面图的提示词。
+         */
+        private String coverPrompt;
+    }
+
+    /**
+     * Rednote 图片生成结果，保存 URL、提示词和生成状态。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RednoteImageResult implements Serializable {
+
+        /**
+         * 图片顺序，普通配图从 1 开始，封面图固定为 0。
+         */
+        private Integer position;
+
+        /**
+         * 图片类型：NORMAL 或 COVER。
+         */
+        private String type;
+
+        /**
+         * 图片公开访问 URL。
+         */
+        private String url;
+
+        /**
+         * 本次图片生成使用的提示词。
+         */
+        private String prompt;
+
+        /**
+         * 本次图片生成使用的模型。
+         */
+        private String model;
+
+        /**
+         * 单张图片生成状态：SUCCESS/FAILED。
+         */
+        private String status;
+
+        /**
+         * 单张图片失败原因。
+         */
+        private String errorMessage;
     }
 }

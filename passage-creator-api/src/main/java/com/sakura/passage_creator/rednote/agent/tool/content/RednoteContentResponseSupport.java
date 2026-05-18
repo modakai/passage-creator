@@ -62,7 +62,8 @@ public final class RednoteContentResponseSupport {
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put(RednoteWorkflowState.KEY_COPYWRITING, contentResponse);
         updates.put(RednoteWorkflowState.KEY_BODY_CONTENT, contentResponse.getBodyContent());
-        updates.put(RednoteWorkflowState.KEY_TAGS, contentResponse.getTags());
+        // tags 会继续进入图片提示词 Agent 的模板，转成 JSON 字符串避免集合变量渲染失败。
+        updates.put(RednoteWorkflowState.KEY_TAGS, JSONUtil.toJsonStr(contentResponse.getTags()));
         return updates;
     }
 

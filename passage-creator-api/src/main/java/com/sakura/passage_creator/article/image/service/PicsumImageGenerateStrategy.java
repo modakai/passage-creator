@@ -1,8 +1,9 @@
 package com.sakura.passage_creator.article.image.service;
 
 import com.sakura.passage_creator.article.agent.state.ArticleState;
-import com.sakura.passage_creator.article.model.dto.image.ImageData;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowImageData;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowRemoteImageDownloader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 public class PicsumImageGenerateStrategy implements ImageGenerateStrategy {
 
-    private final RemoteImageDownloader remoteImageDownloader;
+    private final WorkflowRemoteImageDownloader remoteImageDownloader;
 
     @Override
     public ImageMethodEnum getMethod() {
@@ -57,7 +58,7 @@ public class PicsumImageGenerateStrategy implements ImageGenerateStrategy {
     /**
      * 构造无外部依赖的 SVG 占位图，保证最终降级策略可用。
      */
-    private ImageData buildLocalFallbackSvg(ArticleState.ImageRequirement requirement) {
+    private WorkflowImageData buildLocalFallbackSvg(ArticleState.ImageRequirement requirement) {
         String title = escapeXml(requirement.getSectionTitle() == null ? "文章配图" : requirement.getSectionTitle());
         String svg = """
                 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
@@ -67,7 +68,7 @@ public class PicsumImageGenerateStrategy implements ImageGenerateStrategy {
                   <text x="600" y="440" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#6b7280">Image placeholder</text>
                 </svg>
                 """.formatted(title);
-        return ImageData.builder()
+        return WorkflowImageData.builder()
                 .bytes(svg.getBytes(StandardCharsets.UTF_8))
                 .mimeType("image/svg+xml")
                 .extension(".svg")

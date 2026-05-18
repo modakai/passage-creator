@@ -87,7 +87,8 @@ public class RednoteContentAgentHook extends AgentHook {
             RednoteContentResponseSupport.normalizeContent(contentResponse, tagCount);
             return contentResponse;
         }
-        if (outputValue instanceof String outputText && StringUtils.isNotBlank(outputText)) {
+        String outputText = assistantText(outputValue);
+        if (StringUtils.isNotBlank(outputText)) {
             return RednoteContentResponseSupport.parseAndNormalize(outputText, tagCount);
         }
         if (outputValue != null) {
@@ -128,12 +129,32 @@ public class RednoteContentAgentHook extends AgentHook {
             throw new IllegalStateException("ContentAgent messages 类型不正确");
         }
         for (int index = messages.size() - 1; index >= 0; index--) {
-            Message message = (Message) messages.get(index);
-            if (message instanceof AssistantMessage assistantMessage && StringUtils.isNotBlank(assistantMessage.getText())) {
-                return assistantMessage.getText();
+            String assistantText = assistantText(messages.get(index));
+            if (StringUtils.isNotBlank(assistantText)) {
+                return assistantText;
             }
         }
         throw new IllegalStateException("ContentAgent 未返回 AssistantMessage");
+    }
+
+    /**
+     * 兼容 AssistantMessage 以及旧 checkpoint 反序列化后的 Map 文本结构。
+     */
+    private String assistantText(Object value) {
+        if (value instanceof AssistantMessage assistantMessage) {
+            return assistantMessage.getText();
+        }
+        if (value instanceof Message message) {
+            return message.getText();
+        }
+        if (value instanceof Map<?, ?> map) {
+            Object text = map.get("text");
+            if (text == null) {
+                text = map.get("content");
+            }
+            return text == null ? null : text.toString();
+        }
+        return value instanceof String text ? text : null;
     }
 
     /**

@@ -63,6 +63,12 @@ public class PromptUsageLogServiceImpl extends ServiceImpl<PromptUsageLogMapper,
     @Override
     public void recordUsage(PromptTemplateRenderResult result, String agentName, String taskId, boolean responseOk,
             String errorMessage, Integer latencyMs) {
+        recordUsage(result, agentName, taskId, resolveCurrentUserId(), responseOk, errorMessage, latencyMs);
+    }
+
+    @Override
+    public void recordUsage(PromptTemplateRenderResult result, String agentName, String taskId, Long userId,
+            boolean responseOk, String errorMessage, Integer latencyMs) {
         if (result == null) {
             return;
         }
@@ -73,7 +79,7 @@ public class PromptUsageLogServiceImpl extends ServiceImpl<PromptUsageLogMapper,
         request.setEnvironment(result.environment());
         request.setAgentName(agentName);
         request.setTaskId(taskId);
-        request.setUserId(resolveCurrentUserId());
+        request.setUserId(userId);
         request.setResponseOk(responseOk);
         request.setErrorMessage(errorMessage);
         request.setLatencyMs(latencyMs);

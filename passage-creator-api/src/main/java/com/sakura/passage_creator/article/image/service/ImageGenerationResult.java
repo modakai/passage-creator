@@ -1,6 +1,6 @@
 package com.sakura.passage_creator.article.image.service;
 
-import com.sakura.passage_creator.article.model.dto.image.ImageData;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowImageData;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
 import lombok.Builder;
 import lombok.Data;
@@ -20,7 +20,7 @@ public class ImageGenerationResult {
     /**
      * 可上传到 OSS 的图片二进制数据。
      */
-    private ImageData imageData;
+    private WorkflowImageData imageData;
 
     /**
      * 可选描述，策略可以覆盖 Markdown alt 文本。

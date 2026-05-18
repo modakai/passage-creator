@@ -6,7 +6,7 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatModel;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
-import com.sakura.passage_creator.article.model.dto.image.ImageData;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowImageData;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
 import com.sakura.passage_creator.billing.api.AiBillingReservation;
 import com.sakura.passage_creator.billing.api.AiBillingService;
@@ -53,7 +53,7 @@ public class SvgDiagramImageGenerateStrategy implements ImageGenerateStrategy {
     }
 
     /**
-     * 根据配图需求生成 SVG 概念图源码，并转换为 ImageData 交给 OSS 上传。
+     * 根据配图需求生成 SVG 概念图源码，并转换为 WorkflowImageData 交给 OSS 上传。
      */
     @Override
     public ImageGenerationResult generate(ArticleState.ImageRequirement requirement) {
@@ -110,7 +110,7 @@ public class SvgDiagramImageGenerateStrategy implements ImageGenerateStrategy {
         log.info("SVG 概念图生成成功, position={}, size={} chars", requirement.getPosition(), svgCode.length());
         return ImageGenerationResult.builder()
                 .method(getMethod())
-                .imageData(ImageData.builder()
+                .imageData(WorkflowImageData.builder()
                         .bytes(svgCode.getBytes(StandardCharsets.UTF_8))
                         .mimeType("image/svg+xml")
                         .extension(".svg")

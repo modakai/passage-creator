@@ -35,6 +35,20 @@ public interface PromptUsageLogService extends IService<PromptUsageLog> {
             String errorMessage, Integer latencyMs);
 
     /**
+     * 根据渲染结果记录指定用户的 Prompt 使用日志。
+     *
+     * @param result 渲染结果
+     * @param agentName Agent 名称
+     * @param taskId 任务 id
+     * @param userId 任务所属用户 id
+     * @param responseOk 是否成功
+     * @param errorMessage 失败原因
+     * @param latencyMs 耗时毫秒
+     */
+    void recordUsage(PromptTemplateRenderResult result, String agentName, String taskId, Long userId,
+            boolean responseOk, String errorMessage, Integer latencyMs);
+
+    /**
      * 构建分页查询条件。
      *
      * @param request 查询请求

@@ -7,6 +7,7 @@ import cn.hutool.json.JSONUtil;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.config.IconifyImageProperties;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowRemoteImageDownloader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,7 +24,7 @@ public class IconifyImageGenerateStrategy implements ImageGenerateStrategy {
 
     private final IconifyImageProperties properties;
 
-    private final RemoteImageDownloader remoteImageDownloader;
+    private final WorkflowRemoteImageDownloader remoteImageDownloader;
 
     private final RestClient restClient = RestClient.builder().build();
 

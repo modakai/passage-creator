@@ -106,13 +106,13 @@ public class ContentGeneratorAgent {
             billed = true;
 
             state.setContent(response);
-            recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), true, null, startMillis);
+            recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), userId, true, null, startMillis);
             log.info("阶段3：生成正文完毕, taskId={}", state.getTaskId());
         } catch (RuntimeException e) {
             if (!billed) {
                 aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
             }
-            recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), false, e.getMessage(), startMillis);
+            recordPromptUsage(systemPrompt, userPrompt, state.getTaskId(), userId, false, e.getMessage(), startMillis);
             throw e;
         }
     }
@@ -121,10 +121,11 @@ public class ContentGeneratorAgent {
      * 记录正文 Agent 本次调用使用的系统 Prompt 和用户 Prompt。
      */
     private void recordPromptUsage(PromptTemplateRenderResult systemPrompt, PromptTemplateRenderResult userPrompt,
-                                   String taskId, boolean responseOk, String errorMessage, long startMillis) {
+                                   String taskId, Long userId, boolean responseOk, String errorMessage,
+                                   long startMillis) {
         Integer latencyMs = Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
-        promptUsageLogService.recordUsage(systemPrompt, "ContentGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
-        promptUsageLogService.recordUsage(userPrompt, "ContentGeneratorAgent", taskId, responseOk, errorMessage, latencyMs);
+        promptUsageLogService.recordUsage(systemPrompt, "ContentGeneratorAgent", taskId, userId, responseOk, errorMessage, latencyMs);
+        promptUsageLogService.recordUsage(userPrompt, "ContentGeneratorAgent", taskId, userId, responseOk, errorMessage, latencyMs);
     }
 
     private Integer resolveLatency(long startMillis) {

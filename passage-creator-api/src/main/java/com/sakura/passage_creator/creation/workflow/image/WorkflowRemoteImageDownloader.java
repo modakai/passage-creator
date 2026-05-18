@@ -1,16 +1,15 @@
-package com.sakura.passage_creator.article.image.service;
+package com.sakura.passage_creator.creation.workflow.image;
 
-import com.sakura.passage_creator.article.model.dto.image.ImageData;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 /**
- * 远程图片下载器，用于兼容返回 URL 的 OpenAI 中转站。
+ * workflow 通用远程图片下载器，用于处理图片模型或图库返回的临时 URL。
  */
 @Component
-public class RemoteImageDownloader {
+public class WorkflowRemoteImageDownloader {
 
     private static final String DEFAULT_MIME_TYPE = "image/png";
 
@@ -24,7 +23,7 @@ public class RemoteImageDownloader {
      * @param imageUrl 远程图片 URL
      * @return 图片二进制数据
      */
-    public ImageData download(String imageUrl) {
+    public WorkflowImageData download(String imageUrl) {
         ResponseEntity<byte[]> response = restClient.get()
                 .uri(imageUrl)
                 .retrieve()
@@ -35,7 +34,7 @@ public class RemoteImageDownloader {
         }
 
         String mimeType = resolveMimeType(response);
-        return ImageData.builder()
+        return WorkflowImageData.builder()
                 .bytes(bytes)
                 .mimeType(mimeType)
                 .extension(resolveExtension(mimeType))

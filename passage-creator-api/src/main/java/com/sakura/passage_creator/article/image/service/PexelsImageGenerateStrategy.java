@@ -7,6 +7,7 @@ import cn.hutool.json.JSONUtil;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.config.PexelsImageProperties;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowRemoteImageDownloader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,7 +24,7 @@ public class PexelsImageGenerateStrategy implements ImageGenerateStrategy {
 
     private final PexelsImageProperties properties;
 
-    private final RemoteImageDownloader remoteImageDownloader;
+    private final WorkflowRemoteImageDownloader remoteImageDownloader;
 
     private final RestClient restClient = RestClient.builder().build();
 
@@ -38,7 +39,7 @@ public class PexelsImageGenerateStrategy implements ImageGenerateStrategy {
     }
 
     /**
-     * 使用关键词搜索 Pexels，并把命中的远程图片下载为 ImageData 交给 OSS 上传。
+     * 使用关键词搜索 Pexels，并把命中的远程图片下载为 WorkflowImageData 交给 OSS 上传。
      */
     @Override
     public ImageGenerationResult generate(ArticleState.ImageRequirement requirement) {

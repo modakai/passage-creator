@@ -338,6 +338,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/rednote-creator/': RouteRecordInfo<
+      '/rednote-creator/',
+      '/rednote-creator',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/settings/': RouteRecordInfo<
       '/settings/',
       '/settings',
@@ -660,6 +667,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/prop-components/index.vue': {
       routes:
         | '/prop-components/'
+      views:
+        | never
+    }
+    'src/pages/rednote-creator/index.vue': {
+      routes:
+        | '/rednote-creator/'
       views:
         | never
     }

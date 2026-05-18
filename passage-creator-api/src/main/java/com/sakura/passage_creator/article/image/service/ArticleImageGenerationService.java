@@ -2,6 +2,7 @@ package com.sakura.passage_creator.article.image.service;
 
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowImageStorageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -20,10 +21,10 @@ public class ArticleImageGenerationService {
 
     private final Map<ImageMethodEnum, ImageGenerateStrategy> strategyMap = new EnumMap<>(ImageMethodEnum.class);
 
-    private final ArticleImageStorageService imageStorageService;
+    private final WorkflowImageStorageService imageStorageService;
 
     public ArticleImageGenerationService(List<ImageGenerateStrategy> strategies,
-            ArticleImageStorageService imageStorageService) {
+            WorkflowImageStorageService imageStorageService) {
         this.imageStorageService = imageStorageService;
         for (ImageGenerateStrategy strategy : strategies) {
             strategyMap.put(strategy.getMethod(), strategy);

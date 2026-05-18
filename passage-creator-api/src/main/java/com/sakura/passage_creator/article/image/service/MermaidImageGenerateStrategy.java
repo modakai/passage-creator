@@ -3,7 +3,7 @@ package com.sakura.passage_creator.article.image.service;
 import cn.hutool.core.util.StrUtil;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
 import com.sakura.passage_creator.article.config.MermaidImageProperties;
-import com.sakura.passage_creator.article.model.dto.image.ImageData;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowImageData;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,7 +52,7 @@ public class MermaidImageGenerateStrategy implements ImageGenerateStrategy {
         log.info("Mermaid 图表渲染成功, position={}, size={} bytes", requirement.getPosition(), bytes.length);
         return ImageGenerationResult.builder()
                 .method(getMethod())
-                .imageData(ImageData.builder()
+                .imageData(WorkflowImageData.builder()
                         .bytes(bytes)
                         .mimeType(resolveMimeType())
                         .extension(resolveExtension())

@@ -3,12 +3,11 @@ package com.sakura.passage_creator.creation.workflow.service;
 import cn.hutool.json.JSONUtil;
 import com.sakura.passage_creator.article.model.dto.SseMessage;
 import com.sakura.passage_creator.article.model.enums.SseMessageTypeEnum;
-import com.sakura.passage_creator.article.workflow.ArticleWorkflowNodeType;
-import com.sakura.passage_creator.article.manager.SseEmitterManager;
 import com.sakura.passage_creator.creation.workflow.WorkflowEvent;
 import com.sakura.passage_creator.creation.workflow.WorkflowEventPublisher;
 import com.sakura.passage_creator.creation.workflow.enums.CreationTypeEnum;
 import com.sakura.passage_creator.creation.workflow.enums.WorkflowEventTypeEnum;
+import com.sakura.passage_creator.article.workflow.ArticleWorkflowNodeType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -21,9 +20,9 @@ import java.util.Map;
 @Slf4j
 public class SseWorkflowEventPublisher implements WorkflowEventPublisher {
 
-    private final SseEmitterManager sseEmitterManager;
+    private final WorkflowSseEmitterManager sseEmitterManager;
 
-    public SseWorkflowEventPublisher(SseEmitterManager sseEmitterManager) {
+    public SseWorkflowEventPublisher(WorkflowSseEmitterManager sseEmitterManager) {
         this.sseEmitterManager = sseEmitterManager;
     }
 

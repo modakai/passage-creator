@@ -1,7 +1,7 @@
 package com.sakura.passage_creator.article.agent;
 
 import com.sakura.passage_creator.article.agent.state.ArticleState;
-import com.sakura.passage_creator.article.image.service.ArticleImageStorageService;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowImageStorageService;
 import com.sakura.passage_creator.article.image.service.ImageGenerationResult;
 import com.sakura.passage_creator.article.image.service.ImageToolRegistry;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
@@ -23,11 +23,11 @@ public class ImageAgent {
 
     private final ImageToolRegistry imageToolRegistry;
 
-    private final ArticleImageStorageService imageStorageService;
+    private final WorkflowImageStorageService imageStorageService;
 
     public ImageAgent(ImageAnalyzerAgent imageAnalyzerAgent,
             ImageToolRegistry imageToolRegistry,
-            ArticleImageStorageService imageStorageService) {
+            WorkflowImageStorageService imageStorageService) {
         this.imageAnalyzerAgent = imageAnalyzerAgent;
         this.imageToolRegistry = imageToolRegistry;
         this.imageStorageService = imageStorageService;

@@ -1,9 +1,8 @@
-package com.sakura.passage_creator.article.image.service;
+package com.sakura.passage_creator.creation.workflow.image;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.model.ObjectMetadata;
 import com.aliyun.oss.model.PutObjectRequest;
-import com.sakura.passage_creator.article.model.dto.image.ImageData;
 import com.sakura.passage_creator.infrastructure.config.OssConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -12,11 +11,11 @@ import java.io.ByteArrayInputStream;
 import java.util.UUID;
 
 /**
- * 文章配图存储服务，负责把生成出的图片字节上传到 OSS。
+ * workflow 通用图片存储服务，负责把生成出的图片字节上传到 OSS。
  */
 @Service
 @Slf4j
-public class ArticleImageStorageService {
+public class WorkflowImageStorageService {
 
     /**
      * OSS 客户端。
@@ -28,7 +27,7 @@ public class ArticleImageStorageService {
      */
     private final OssConfig.OssProperties ossProperties;
 
-    public ArticleImageStorageService(OSS ossClient, OssConfig.OssProperties ossProperties) {
+    public WorkflowImageStorageService(OSS ossClient, OssConfig.OssProperties ossProperties) {
         this.ossClient = ossClient;
         this.ossProperties = ossProperties;
     }
@@ -40,12 +39,24 @@ public class ArticleImageStorageService {
      * @param imageData 图片数据
      * @return 图片 URL
      */
-    public String uploadArticleImage(String taskId, ImageData imageData) {
+    public String uploadArticleImage(String taskId, WorkflowImageData imageData) {
+        return uploadGeneratedImage("article", taskId, imageData);
+    }
+
+    /**
+     * 上传生成图片并返回公开访问地址，bizType 用于区分 article、rednote 等业务目录。
+     *
+     * @param bizType   业务类型目录
+     * @param taskId    任务 id
+     * @param imageData 图片数据
+     * @return 图片 URL
+     */
+    public String uploadGeneratedImage(String bizType, String taskId, WorkflowImageData imageData) {
         if (imageData == null || !imageData.isValid()) {
             throw new IllegalArgumentException("图片数据无效，无法上传 OSS");
         }
 
-        String objectName = buildObjectName(taskId, imageData.getExtension());
+        String objectName = buildObjectName(bizType, taskId, imageData.getExtension());
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentType(imageData.getMimeType());
         metadata.setContentLength(imageData.getBytes().length);
@@ -59,18 +70,19 @@ public class ArticleImageStorageService {
         ossClient.putObject(request);
 
         String url = buildPublicUrl(objectName);
-        log.info("文章配图上传成功, taskId={}, url={}", taskId, url);
+        log.info("workflow 图片上传成功, bizType={}, taskId={}, url={}", bizType, taskId, url);
         return url;
     }
 
     /**
-     * 构造文章配图对象名，按任务隔离便于排查和清理。
+     * 构造图片对象名，按业务类型和任务隔离便于排查和清理。
      */
-    private String buildObjectName(String taskId, String extension) {
+    private String buildObjectName(String bizType, String taskId, String extension) {
         String prefix = ossProperties.getPrefix() == null ? "" : ossProperties.getPrefix().replaceAll("/+$", "");
         String ext = extension == null || extension.isBlank() ? ".png" : extension;
         String normalizedPrefix = prefix.isBlank() ? "" : prefix + "/";
-        return "%sarticle/%s/%s%s".formatted(normalizedPrefix, taskId, UUID.randomUUID(), ext);
+        String safeBizType = bizType == null || bizType.isBlank() ? "generated" : bizType.replaceAll("[^a-zA-Z0-9_-]", "");
+        return "%s%s/%s/%s%s".formatted(normalizedPrefix, safeBizType, taskId, UUID.randomUUID(), ext);
     }
 
     /**

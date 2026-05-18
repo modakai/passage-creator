@@ -3,7 +3,7 @@ package com.sakura.passage_creator.article.image.service;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONUtil;
-import com.sakura.passage_creator.article.model.dto.image.ImageData;
+import com.sakura.passage_creator.creation.workflow.image.WorkflowImageData;
 import org.springframework.stereotype.Component;
 
 import java.util.Base64;
@@ -24,13 +24,13 @@ public class OpenAiImageResponseParser {
      * @param responseBody OpenAI 原始 JSON 响应
      * @return 图片二进制数据
      */
-    public ImageData parseImageData(String responseBody) {
+    public WorkflowImageData parseImageData(String responseBody) {
         ParsedImage parsedImage = parseFirstImage(responseBody);
         if (!parsedImage.hasBase64()) {
             throw new IllegalArgumentException("OpenAI 图片响应缺少 b64_json");
         }
         String normalizedBase64 = normalizeBase64(parsedImage.b64Json());
-        return ImageData.builder()
+        return WorkflowImageData.builder()
                 .bytes(Base64.getDecoder().decode(normalizedBase64))
                 .mimeType(DEFAULT_MIME_TYPE)
                 .extension(DEFAULT_EXTENSION)
