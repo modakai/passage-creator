@@ -103,16 +103,15 @@ wx:
     appId: ${WX_OPEN_APP_ID:xxx}
     appSecret: ${WX_OPEN_APP_SECRET:xxx}
 
-# OpenAI 图片生成配置。GPT_IMAGE 策略使用此配置。
+# OpenAI 图片生成配置。article 与 rednote 的图片生成共享此配置。
 openai:
   image:
     api-key: ${OPENAI_API_KEY:}
     base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
-    model: ${OPENAI_IMAGE_MODEL:gpt-image-2}
     size:
     quality:
     output-format: ${OPENAI_IMAGE_OUTPUT_FORMAT:png}
-    max-section-images: ${OPENAI_IMAGE_MAX_SECTION_IMAGES:2}
+    max-section-images: ${OPENAI_IMAGE_MAX_SECTION_IMAGES:5}
 
 # Pexels 图库检索配置。未配置 API Key 时会自动降级。
 pexels:

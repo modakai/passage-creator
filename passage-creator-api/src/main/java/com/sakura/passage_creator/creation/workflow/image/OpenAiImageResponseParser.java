@@ -1,9 +1,8 @@
-package com.sakura.passage_creator.article.image.service;
+package com.sakura.passage_creator.creation.workflow.image;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONUtil;
-import com.sakura.passage_creator.creation.workflow.image.WorkflowImageData;
 import org.springframework.stereotype.Component;
 
 import java.util.Base64;

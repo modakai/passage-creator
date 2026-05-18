@@ -1,5 +1,6 @@
 package com.sakura.passage_creator.article.manager;
 
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -122,5 +123,25 @@ public class SseEmitterManager {
      */
     public boolean exists(String taskId) {
         return emitterMap.containsKey(taskId);
+    }
+
+    /**
+     * Spring 容器关闭时主动完成所有文章 SSE，兼容仍在使用的旧文章生成链路。
+     */
+    @PreDestroy
+    public void destroy() {
+        if (emitterMap.isEmpty()) {
+            return;
+        }
+        log.info("文章 SSE 管理器销毁，准备关闭活跃连接数量={}", emitterMap.size());
+        emitterMap.forEach((taskId, emitter) -> {
+            try {
+                emitter.complete();
+            } catch (Exception ignored) {
+                // 停服时客户端可能已经断开，忽略二次关闭异常。
+            } finally {
+                emitterMap.remove(taskId, emitter);
+            }
+        });
     }
 }

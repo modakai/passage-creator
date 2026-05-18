@@ -13,13 +13,14 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.AsyncHandlerInterceptor;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
  * 登录拦截器，负责解析 token 并写入当前请求用户上下文。
  */
 @Component
-public class LoginInterceptor implements HandlerInterceptor {
+public class LoginInterceptor implements HandlerInterceptor, AsyncHandlerInterceptor {
 
     /**
      * Token 管理器。
@@ -87,6 +88,19 @@ public class LoginInterceptor implements HandlerInterceptor {
      */
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        LoginUserContext.clear();
+    }
+
+    /**
+     * 异步请求启动后当前 Servlet 线程会被复用，必须立即清理登录上下文。
+     *
+     * @param request 请求对象
+     * @param response 响应对象
+     * @param handler 处理器
+     */
+    @Override
+    public void afterConcurrentHandlingStarted(HttpServletRequest request, HttpServletResponse response,
+            Object handler) {
         LoginUserContext.clear();
     }
 

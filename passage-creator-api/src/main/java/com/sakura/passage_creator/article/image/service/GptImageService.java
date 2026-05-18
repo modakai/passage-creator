@@ -2,19 +2,14 @@ package com.sakura.passage_creator.article.image.service;
 
 import cn.hutool.core.util.StrUtil;
 import com.sakura.passage_creator.article.agent.state.ArticleState;
-import com.sakura.passage_creator.article.config.OpenAiImageProperties;
 import com.sakura.passage_creator.article.model.enums.ImageMethodEnum;
 import com.sakura.passage_creator.billing.api.AiBillingReservation;
 import com.sakura.passage_creator.billing.api.AiBillingService;
+import com.sakura.passage_creator.creation.workflow.image.OpenAiImageGenerationClient;
+import com.sakura.passage_creator.creation.workflow.image.OpenAiImageProperties;
 import com.sakura.passage_creator.creation.workflow.image.WorkflowImageData;
-import com.sakura.passage_creator.creation.workflow.image.WorkflowRemoteImageDownloader;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * GPT Image 2 图片生成服务，封装 OpenAI Image API 调用。
@@ -29,32 +24,20 @@ public class GptImageService implements ImageGenerateStrategy {
     private final OpenAiImageProperties properties;
 
     /**
-     * OpenAI 图片响应解析器。
+     * 共享 OpenAI 图片生成客户端。
      */
-    private final OpenAiImageResponseParser responseParser;
-
-    /**
-     * 远程图片下载器，用于处理中转站返回 URL 的场景。
-     */
-    private final WorkflowRemoteImageDownloader remoteImageDownloader;
-
-    /**
-     * Spring REST 客户端。
-     */
-    private final RestClient restClient;
+    private final OpenAiImageGenerationClient imageGenerationClient;
 
     /**
      * AI 计费服务，GPT_IMAGE 按固定图片成本计费。
      */
     private final AiBillingService aiBillingService;
 
-    public GptImageService(OpenAiImageProperties properties, OpenAiImageResponseParser responseParser,
-            WorkflowRemoteImageDownloader remoteImageDownloader, AiBillingService aiBillingService) {
+    public GptImageService(OpenAiImageProperties properties, OpenAiImageGenerationClient imageGenerationClient,
+            AiBillingService aiBillingService) {
         this.properties = properties;
-        this.responseParser = responseParser;
-        this.remoteImageDownloader = remoteImageDownloader;
+        this.imageGenerationClient = imageGenerationClient;
         this.aiBillingService = aiBillingService;
-        this.restClient = RestClient.builder().build();
     }
 
     /**
@@ -64,23 +47,9 @@ public class GptImageService implements ImageGenerateStrategy {
      * @return 图片二进制数据
      */
     public WorkflowImageData generateImage(ArticleState.ImageRequirement requirement) {
-        validateConfig();
         String prompt = buildPrompt(requirement);
-        Map<String, Object> requestBody = buildRequestBody(prompt);
-
-        log.info("开始调用 OpenAI 图片生成, model={}, position={}", properties.getModel(), requirement.getPosition());
-        String responseBody = restClient.post()
-                .uri(buildImageGenerationUrl())
-                .contentType(MediaType.APPLICATION_JSON)
-                .header("Authorization", "Bearer " + properties.getApiKey())
-                .body(requestBody)
-                .retrieve()
-                .body(String.class);
-        OpenAiImageResponseParser.ParsedImage parsedImage = responseParser.parseFirstImage(responseBody);
-        if (parsedImage.hasBase64()) {
-            return responseParser.parseImageData(responseBody);
-        }
-        return remoteImageDownloader.download(parsedImage.url());
+        log.info("开始生成 GPT 图片, model={}, position={}", properties.getModel(), requirement.getPosition());
+        return imageGenerationClient.generateImage(prompt);
     }
 
     /**
@@ -119,48 +88,6 @@ public class GptImageService implements ImageGenerateStrategy {
     @Override
     public ImageMethodEnum getMethod() {
         return ImageMethodEnum.GPT_IMAGE;
-    }
-
-    /**
-     * 校验 OpenAI 调用所需配置，避免任务运行到远程调用时才出现模糊错误。
-     */
-    private void validateConfig() {
-        if (StrUtil.isBlank(properties.getApiKey())) {
-            throw new IllegalStateException("OpenAI API Key 未配置，请设置 OPENAI_API_KEY");
-        }
-        if (StrUtil.isBlank(properties.getModel())) {
-            throw new IllegalStateException("OpenAI 图片模型未配置");
-        }
-    }
-
-    /**
-     * 构建 OpenAI 图片生成请求体。
-     */
-    private Map<String, Object> buildRequestBody(String prompt) {
-        Map<String, Object> requestBody = new LinkedHashMap<>();
-        requestBody.put("model", properties.getModel());
-        requestBody.put("prompt", prompt);
-        putIfNotBlank(requestBody, "size", properties.getSize());
-        putIfNotBlank(requestBody, "quality", properties.getQuality());
-        putIfNotBlank(requestBody, "output_format", properties.getOutputFormat());
-        return requestBody;
-    }
-
-    /**
-     * 构造图片生成地址。中转站通常把 base_url 配成 https://xxx/v1。
-     */
-    private String buildImageGenerationUrl() {
-        String baseUrl = properties.getBaseUrl().replaceAll("/+$", "");
-        return baseUrl + "/images/generations";
-    }
-
-    /**
-     * 只在配置有值时传递可选参数，增强对中转站兼容层的容错。
-     */
-    private void putIfNotBlank(Map<String, Object> requestBody, String key, String value) {
-        if (StrUtil.isNotBlank(value)) {
-            requestBody.put(key, value);
-        }
     }
 
     /**

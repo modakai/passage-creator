@@ -1,5 +1,6 @@
 package com.sakura.passage_creator.creation.workflow.service;
 
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -44,6 +45,8 @@ public class WorkflowSseEmitterManager {
         emitter.onTimeout(() -> {
             log.warn("workflow SSE 连接超时, taskId={}", taskId);
             emitterMap.remove(taskId, emitter);
+            // 超时后显式完成异步响应，避免 Tomcat 在回收阶段发现未结束的 async request。
+            safeComplete(emitter);
         });
         emitter.onCompletion(() -> {
             log.debug("workflow SSE 连接完成, taskId={}", taskId);
@@ -52,6 +55,8 @@ public class WorkflowSseEmitterManager {
         emitter.onError(error -> {
             log.warn("workflow SSE 连接断开, taskId={}, reason={}", taskId, error.getMessage());
             emitterMap.remove(taskId, emitter);
+            // 断线错误也要收口 emitter，保证容器能正常回收 request/response。
+            safeComplete(emitter);
         });
 
         SseEmitter oldEmitter = emitterMap.put(taskId, emitter);
@@ -106,7 +111,7 @@ public class WorkflowSseEmitterManager {
         } catch (Exception e) {
             log.debug("workflow SSE 连接关闭失败, taskId={}, reason={}", taskId, e.getMessage());
         } finally {
-            emitterMap.remove(taskId);
+            emitterMap.remove(taskId, emitter);
         }
     }
 
@@ -115,6 +120,21 @@ public class WorkflowSseEmitterManager {
      */
     public boolean exists(String taskId) {
         return emitterMap.containsKey(taskId);
+    }
+
+    /**
+     * Spring 容器关闭时主动完成所有 SSE，避免停服阶段留下未回收的 async request。
+     */
+    @PreDestroy
+    public void destroy() {
+        if (emitterMap.isEmpty()) {
+            return;
+        }
+        log.info("workflow SSE 管理器销毁，准备关闭活跃连接数量={}", emitterMap.size());
+        emitterMap.forEach((taskId, emitter) -> {
+            safeComplete(emitter);
+            emitterMap.remove(taskId, emitter);
+        });
     }
 
     /**
@@ -135,6 +155,7 @@ public class WorkflowSseEmitterManager {
         return e instanceof IOException
                 || e instanceof AsyncRequestNotUsableException
                 || e.getClass().getName().contains("ClientAbort")
+                || StringUtils.containsIgnoreCase(e.getMessage(), "client abort")
                 || StringUtils.containsIgnoreCase(e.getMessage(), "response errors")
                 || StringUtils.containsIgnoreCase(e.getMessage(), "broken pipe");
     }

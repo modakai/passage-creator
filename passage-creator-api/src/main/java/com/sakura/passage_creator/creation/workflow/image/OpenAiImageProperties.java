@@ -1,11 +1,11 @@
-package com.sakura.passage_creator.article.config;
+package com.sakura.passage_creator.creation.workflow.image;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * OpenAI 图片生成配置，集中控制 gpt-image-2 的模型、尺寸和输出质量。
+ * OpenAI 图片生成配置，集中控制 GPT 图片模型、尺寸和输出质量。
  */
 @Data
 @Component
@@ -23,7 +23,7 @@ public class OpenAiImageProperties {
     private String baseUrl = "https://api.openai.com/v1";
 
     /**
-     * 图片生成模型。官方模型 ID 是 gpt-image-2。
+     * 图片生成模型。可通过 OPENAI_IMAGE_MODEL 切换中转站模型。
      */
     private String model = "gpt-image-2";
 

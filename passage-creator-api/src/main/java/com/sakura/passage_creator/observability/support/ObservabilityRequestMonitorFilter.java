@@ -44,7 +44,8 @@ public class ObservabilityRequestMonitorFilter extends OncePerRequestFilter {
         String uri = request.getRequestURI();
         return !properties.isRequestMonitorEnabled()
                 || uri.contains("/actuator")
-                || uri.contains("/admin/observability/status");
+                || uri.contains("/admin/observability/status")
+                || isSseEndpoint(uri);
     }
 
     @Override
@@ -79,5 +80,15 @@ public class ObservabilityRequestMonitorFilter extends OncePerRequestFilter {
         command.setThrowable(throwable);
         command.setEventTime(new Date());
         eventService.recordRequest(command);
+    }
+
+    /**
+     * SSE 是长连接异步请求，不纳入普通接口耗时监控，避免过滤器参与 async 生命周期。
+     */
+    private boolean isSseEndpoint(String uri) {
+        return uri.contains("/app/article/progress/")
+                || uri.contains("/app/article/sse/")
+                || uri.contains("/app/rednote/progress/")
+                || uri.contains("/app/rednote/sse/");
     }
 }

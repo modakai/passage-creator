@@ -31,6 +31,7 @@ public class SseWorkflowEventPublisher implements WorkflowEventPublisher {
         try {
             sseEmitterManager.send(event.getTaskId(), JSONUtil.toJsonStr(event));
             sendArticleCompatibilityEvent(event);
+            completeIfTerminalEvent(event);
         }
         catch (RuntimeException e) {
             // SSE 推送失败不能反向破坏 workflow 状态，前端可通过进度接口恢复快照。
@@ -122,6 +123,17 @@ public class SseWorkflowEventPublisher implements WorkflowEventPublisher {
     private void send(String taskId, SseMessageTypeEnum type, Object payload) {
         if (payload != null) {
             sseEmitterManager.send(taskId, JSONUtil.toJsonStr(SseMessage.of(type, payload)));
+        }
+    }
+
+    /**
+     * workflow 进入终态后主动关闭 SSE，避免连接和 emitterMap 条目滞留到超时。
+     */
+    private void completeIfTerminalEvent(WorkflowEvent event) {
+        if (WorkflowEventTypeEnum.WORKFLOW_COMPLETED.getValue().equals(event.getType())
+                || WorkflowEventTypeEnum.WORKFLOW_FAILED.getValue().equals(event.getType())
+                || WorkflowEventTypeEnum.WORKFLOW_EXPIRED.getValue().equals(event.getType())) {
+            sseEmitterManager.complete(event.getTaskId());
         }
     }
 }

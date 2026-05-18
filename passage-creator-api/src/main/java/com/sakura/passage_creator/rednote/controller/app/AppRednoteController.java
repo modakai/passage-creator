@@ -163,7 +163,6 @@ public class AppRednoteController {
         RednoteNoteVO noteVO = rednoteNoteService.getRednoteVO(latestNote);
         WorkflowSseMessage<RednoteNoteVO> message = WorkflowSseMessage.of("PROGRESS", "小红书任务进度", noteVO);
         sseEmitterManager.send(taskId, JSONUtil.toJsonStr(message));
-        rednoteWorkflowFacade.publishSnapshot(taskId, loginUser);
         return emitter;
     }
 
