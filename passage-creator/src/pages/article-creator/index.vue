@@ -66,13 +66,8 @@ const router = useRouter()
 const { data: creditSummaryData, isFetching: isFetchingCreditSummary } = useGetCreditSummaryQuery()
 
 const maxTopicLength = 500
-const activeArticleTaskStorageKey = 'sakura_article_creator_active_task'
-const activeArticleTaskTtlMs = 7 * 24 * 60 * 60 * 1000
-
-interface ActiveArticleTaskCache {
-  taskId: string
-  savedAt: number
-}
+// 图片地址后缀识别固定复用，避免下载时重复创建正则对象。
+const imageExtensionPattern = /\.([a-z0-9]+)$/i
 
 interface ActivePromptFeedback {
   stage: PromptFeedbackStage
@@ -422,60 +417,6 @@ function applyProgress(progress: AppArticleProgress) {
 }
 
 /**
- * 读取上次未完成创作任务，7 天外的任务交给后端过期策略处理，前端直接回到新建页。
- */
-function readActiveArticleTaskId() {
-  if (typeof window === 'undefined') {
-    return ''
-  }
-
-  try {
-    const rawCache = window.localStorage.getItem(activeArticleTaskStorageKey)
-    if (!rawCache) {
-      return ''
-    }
-
-    const cache = JSON.parse(rawCache) as ActiveArticleTaskCache
-    const isValidTaskId = typeof cache.taskId === 'string' && cache.taskId.trim().length > 0
-    const isExpired = Date.now() - Number(cache.savedAt ?? 0) > activeArticleTaskTtlMs
-    if (!isValidTaskId || isExpired) {
-      window.localStorage.removeItem(activeArticleTaskStorageKey)
-      return ''
-    }
-    return cache.taskId
-  }
-  catch {
-    window.localStorage.removeItem(activeArticleTaskStorageKey)
-    return ''
-  }
-}
-
-/**
- * 记录当前未完成任务，用户刷新或重新进入创作页时可以重新连接 SSE。
- */
-function rememberActiveArticleTask(nextTaskId: string) {
-  if (typeof window === 'undefined' || !nextTaskId) {
-    return
-  }
-
-  window.localStorage.setItem(activeArticleTaskStorageKey, JSON.stringify({
-    taskId: nextTaskId,
-    savedAt: Date.now(),
-  } satisfies ActiveArticleTaskCache))
-}
-
-/**
- * 任务完成、失败或用户重新开始时清除恢复入口，避免旧任务反复抢占新建页面。
- */
-function forgetActiveArticleTask() {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  window.localStorage.removeItem(activeArticleTaskStorageKey)
-}
-
-/**
  * 将 taskId 同步到 URL，浏览器刷新时不依赖内存状态也能恢复到人工确认节点。
  */
 function syncTaskIdToRouteQuery(nextTaskId: string) {
@@ -531,7 +472,6 @@ function closeCurrentSse() {
  */
 function resetCreatorState() {
   closeCurrentSse()
-  forgetActiveArticleTask()
   clearTaskIdRouteQuery()
   taskId.value = ''
   titleOptions.value = []
@@ -613,7 +553,6 @@ function handleArticleSseMessage(message: ArticleSseMessage) {
     currentPhase.value = 'COMPLETED'
     isConfirmingOutline.value = false
     isConnected.value = false
-    forgetActiveArticleTask()
     toast.success('正文已生成')
   }
 
@@ -636,7 +575,6 @@ function handleArticleSseMessage(message: ArticleSseMessage) {
     isConfirmingTitle.value = false
     isConfirmingOutline.value = false
     isConnected.value = false
-    forgetActiveArticleTask()
     toast.error('任务已过期，请重新生成')
   }
 
@@ -646,7 +584,6 @@ function handleArticleSseMessage(message: ArticleSseMessage) {
     isConfirmingTitle.value = false
     isConfirmingOutline.value = false
     isConnected.value = false
-    forgetActiveArticleTask()
     toast.error(String(message.data ?? message.message ?? '文章生成失败'))
   }
 }
@@ -658,7 +595,6 @@ function connectTaskProgress(nextTaskId: string) {
   closeCurrentSse()
   taskId.value = nextTaskId
   isConnected.value = true
-  rememberActiveArticleTask(nextTaskId)
   syncTaskIdToRouteQuery(nextTaskId)
 
   closeSse = connectArticleSse(nextTaskId, {
@@ -715,7 +651,7 @@ function resolveImageExtension(url: string, contentType?: string | null) {
 
   try {
     const pathname = new URL(url).pathname
-    const matched = pathname.match(/\.([a-zA-Z0-9]+)$/)
+    const matched = pathname.match(imageExtensionPattern)
     return matched?.[1]?.toLowerCase() || 'png'
   }
   catch {
@@ -906,8 +842,8 @@ onUnmounted(() => {
 onMounted(() => {
   window.addEventListener('pagehide', handleArticlePageExit)
   window.addEventListener('beforeunload', handleArticlePageExit)
-  // 首页带 topic 进入时优先展示新建表单，避免本地缓存覆盖用户这次的新选题。
-  const resumeTaskId = initialTaskId || (typeof initialTopic === 'string' ? '' : readActiveArticleTaskId())
+  // 只允许显式 taskId 恢复任务；普通创作页访问必须展示新建表单。
+  const resumeTaskId = initialTaskId
   if (!resumeTaskId) {
     return
   }

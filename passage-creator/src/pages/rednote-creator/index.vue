@@ -3,6 +3,7 @@ import {
   CheckCircle2Icon,
   ClipboardIcon,
   DownloadIcon,
+  ExternalLinkIcon,
   FileTextIcon,
   ImagesIcon,
   LoaderCircleIcon,
@@ -46,16 +47,34 @@ const isConnected = ref(false)
 let closeSse: (() => void) | null = null
 
 const maxContentLength = 2000
-const activeRednoteTaskStorageKey = 'sakura_rednote_creator_active_task'
+// 关键词字段可能是空白分隔格式，复用正则避免每次解析时重复创建。
+const whitespaceSeparatorPattern = /\s+/
 
 const phaseSteps: Array<{ phase: RednotePhase, title: string, desc: string }> = [
-  { phase: 'PENDING', title: '排队', desc: '创建任务' },
-  { phase: 'SEARCH_AGENT', title: '搜索', desc: '检索素材' },
-  { phase: 'COPY_GENERATING', title: '文案', desc: '生成正文' },
-  { phase: 'IMAGE_PROMPT_GENERATING', title: '提示词', desc: '规划图片' },
-  { phase: 'IMAGE_GENERATING', title: '图片', desc: '并行生成' },
-  { phase: 'COMPLETED', title: '完成', desc: '结果入库' },
+  { phase: 'PENDING', title: '任务排队中', desc: '正在准备创作任务' },
+  { phase: 'SEARCH_AGENT', title: '网页检索中', desc: '正在查找可参考素材' },
+  { phase: 'COPY_GENERATING', title: '文案生成中', desc: '正在撰写小红书正文' },
+  { phase: 'IMAGE_PROMPT_GENERATING', title: '图片规划中', desc: '正在整理封面和配图需求' },
+  { phase: 'IMAGE_GENERATING', title: '图片生成中', desc: '正在生成封面和配图' },
+  { phase: 'COMPLETED', title: '生成完成', desc: '内容和图片已保存' },
 ]
+
+const phaseDisplayLabels: Record<string, string> = {
+  PENDING: '任务排队中',
+  SEARCH_AGENT: '网页检索中',
+  COPY_GENERATING: '文案生成中',
+  IMAGE_PROMPT_GENERATING: '图片规划中',
+  IMAGE_GENERATING: '图片生成中',
+  COMPLETED: '生成完成',
+  FAILED: '生成失败',
+}
+
+const statusDisplayLabels: Record<string, string> = {
+  PENDING: '等待处理',
+  PROCESSING: '生成中',
+  COMPLETED: '已完成',
+  FAILED: '生成失败',
+}
 
 const currentPhase = computed<RednotePhase>(() => activeNote.value?.phase ?? (taskId.value ? 'PENDING' : 'PENDING'))
 const currentStatus = computed(() => activeNote.value?.status ?? (taskId.value ? 'PENDING' : undefined))
@@ -78,6 +97,7 @@ const progressValue = computed(() => {
 const tags = computed(() => parseStringArray(activeNote.value?.tags))
 const keywords = computed(() => parseStringArray(activeNote.value?.keywords))
 const searchResults = computed(() => parseJsonArray<RednoteSearchResult>(activeNote.value?.searchResults))
+const visibleSearchResults = computed(() => searchResults.value.filter(result => result.title || result.sourceName || result.summary || result.sourceUrl))
 const imagePrompts = computed(() => parseJsonArray<RednoteImagePromptItem>(activeNote.value?.imagePrompts))
 const normalImages = computed(() => parseJsonArray<RednoteImageResult>(activeNote.value?.images)
   .filter(image => image.url && image.type !== 'COVER')
@@ -112,41 +132,44 @@ function parseStringArray(value?: string) {
   if (parsed.length > 0) {
     return parsed
   }
-  return value.split(/\s+/).map(item => item.trim()).filter(Boolean)
+  return value.split(whitespaceSeparatorPattern).map(item => item.trim()).filter(Boolean)
 }
 
 /**
- * 记录当前未完成任务，刷新页面后可以自动恢复进度。
+ * 优先使用前端中文阶段名，避免把后端节点名展示给用户。
  */
-function rememberActiveTask(nextTaskId: string) {
-  if (typeof window === 'undefined' || !nextTaskId) {
-    return
+function getPhaseDisplayLabel(note?: AppRednoteItem | null) {
+  const phase = note?.phase
+  if (phase && phaseDisplayLabels[phase]) {
+    return phaseDisplayLabels[phase]
   }
-  window.localStorage.setItem(activeRednoteTaskStorageKey, nextTaskId)
+  return note?.phaseLabel || note?.statusLabel || '未开始'
 }
 
 /**
- * 任务完成或重新开始时清理恢复入口。
+ * 统一将状态值转成中文，兜底时才使用后端标签。
  */
-function forgetActiveTask() {
-  if (typeof window === 'undefined') {
-    return
+function getStatusDisplayLabel(note?: AppRednoteItem | null) {
+  const status = note?.status
+  if (status && statusDisplayLabels[status]) {
+    return statusDisplayLabels[status]
   }
-  window.localStorage.removeItem(activeRednoteTaskStorageKey)
+  return note?.statusLabel || '等待处理'
 }
 
 /**
- * 从 URL 或本地缓存读取需要恢复的 taskId。
+ * 搜索结果标题优先取网页标题，缺失时用来源名称兜底。
+ */
+function getSearchResultTitle(result: RednoteSearchResult) {
+  return result.title || result.sourceName || result.sourceUrl || '检索结果'
+}
+
+/**
+ * 只从 URL 读取恢复任务，避免本地缓存让直接打开创作页时误进入旧任务。
  */
 function resolveInitialTaskId() {
   const queryTaskId = typeof route.query.taskId === 'string' ? route.query.taskId.trim() : ''
-  if (queryTaskId) {
-    return queryTaskId
-  }
-  if (typeof window === 'undefined') {
-    return ''
-  }
-  return window.localStorage.getItem(activeRednoteTaskStorageKey) ?? ''
+  return queryTaskId
 }
 
 /**
@@ -183,9 +206,6 @@ function applyNote(note: AppRednoteItem) {
   content.value = note.content ?? content.value
   if (note.status === 'COMPLETED' || note.status === 'FAILED') {
     stopRealtime()
-    if (note.status === 'COMPLETED') {
-      forgetActiveTask()
-    }
     void loadRecentNotes()
   }
 }
@@ -428,7 +448,6 @@ function toJsonField(value: unknown) {
 function startRealtime(nextTaskId: string) {
   stopRealtime()
   taskId.value = nextTaskId
-  rememberActiveTask(nextTaskId)
   syncTaskIdToRoute(nextTaskId)
   closeSse = connectRednoteSse(nextTaskId, {
     onMessage: (message) => {
@@ -548,7 +567,6 @@ async function copyBodyContent() {
  */
 function resetCreator() {
   stopRealtime()
-  forgetActiveTask()
   taskId.value = ''
   activeNote.value = null
   content.value = ''
@@ -590,7 +608,7 @@ onBeforeUnmount(() => {
         <div>
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
             <WandSparklesIcon class="size-4" />
-            Rednote Workflow
+            小红书智能创作
           </div>
           <h1 class="mt-1 text-2xl font-semibold tracking-tight">
             小红书爆款创作
@@ -647,7 +665,7 @@ onBeforeUnmount(() => {
               生成进度
             </h2>
             <UiBadge :variant="isFailed ? 'destructive' : 'secondary'">
-              {{ activeNote?.phaseLabel ?? activeNote?.statusLabel ?? '未开始' }}
+              {{ getPhaseDisplayLabel(activeNote) }}
             </UiBadge>
           </div>
           <UiProgress :model-value="progressValue" />
@@ -713,7 +731,7 @@ onBeforeUnmount(() => {
                 {{ note.subject || note.content || note.taskId }}
               </div>
               <div class="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                <span>{{ note.phaseLabel || note.statusLabel || note.status }}</span>
+                <span>{{ getPhaseDisplayLabel(note) }}</span>
                 <span>{{ note.createTime?.slice(0, 10) }}</span>
               </div>
             </button>
@@ -732,7 +750,7 @@ onBeforeUnmount(() => {
               输入需求后开始生成
             </h2>
             <p class="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-              后端会按 content → SearchAgent → 文案 Agent → 图片提示词 Agent → 图片生成的链路自动完成。
+              系统会自动完成网页检索、文案生成、图片规划和图片生成。
             </p>
           </div>
         </div>
@@ -744,7 +762,7 @@ onBeforeUnmount(() => {
                 主体
               </div>
               <div class="mt-2 truncate text-sm font-semibold">
-                {{ activeNote?.subject || '等待 SearchAgent 输出' }}
+                {{ activeNote?.subject || '网页检索中' }}
               </div>
             </div>
             <div class="rounded-lg border bg-background p-4">
@@ -768,7 +786,7 @@ onBeforeUnmount(() => {
                 状态
               </div>
               <div class="mt-2 text-sm font-semibold">
-                {{ activeNote?.statusLabel || currentStatus || '等待处理' }}
+                {{ getStatusDisplayLabel(activeNote) || currentStatus || '等待处理' }}
               </div>
             </div>
           </section>
@@ -788,7 +806,7 @@ onBeforeUnmount(() => {
                   任务失败
                 </h2>
                 <p class="mt-1 text-sm text-muted-foreground">
-                  {{ activeNote?.errorMessage || '后端未返回失败原因' }}
+                  {{ activeNote?.errorMessage || '暂未获取到失败原因' }}
                 </p>
               </div>
             </div>
@@ -878,11 +896,11 @@ onBeforeUnmount(() => {
               <div class="rounded-lg border bg-background">
                 <div class="border-b px-5 py-4">
                   <h2 class="font-semibold">
-                    SearchAgent 简报
+                    检索结果
                   </h2>
                 </div>
                 <div class="space-y-4 p-5 text-sm">
-                  <p class="leading-6 text-muted-foreground">
+                  <p v-if="visibleSearchResults.length === 0" class="leading-6 text-muted-foreground">
                     {{ activeNote?.context || '等待搜索和摘要结果' }}
                   </p>
                   <div v-if="keywords.length > 0" class="flex flex-wrap gap-2">
@@ -890,11 +908,22 @@ onBeforeUnmount(() => {
                       {{ keyword }}
                     </UiBadge>
                   </div>
-                  <UiSeparator v-if="searchResults.length > 0" />
-                  <div v-for="result in searchResults" :key="result.sourceUrl || result.title" class="space-y-1">
-                    <div class="flex items-center gap-2 font-medium">
+                  <UiSeparator v-if="visibleSearchResults.length > 0" />
+                  <div v-for="result in visibleSearchResults" :key="result.sourceUrl || result.title || result.summary" class="space-y-1 rounded-md border bg-muted/20 p-3">
+                    <a
+                      v-if="result.sourceUrl"
+                      :href="result.sourceUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="flex items-center gap-2 font-medium text-foreground transition-colors hover:text-primary"
+                    >
                       <SearchIcon class="size-4 text-muted-foreground" />
-                      {{ result.title || result.sourceName || '搜索结果' }}
+                      <span class="line-clamp-1">{{ getSearchResultTitle(result) }}</span>
+                      <ExternalLinkIcon class="ml-auto size-3.5 shrink-0 text-muted-foreground" />
+                    </a>
+                    <div v-else class="flex items-center gap-2 font-medium">
+                      <SearchIcon class="size-4 text-muted-foreground" />
+                      <span class="line-clamp-1">{{ getSearchResultTitle(result) }}</span>
                     </div>
                     <p class="text-xs leading-5 text-muted-foreground">
                       {{ result.summary }}
@@ -911,7 +940,7 @@ onBeforeUnmount(() => {
               正在自动生成
             </h2>
             <p class="mt-2 text-sm text-muted-foreground">
-              当前阶段：{{ activeNote?.phaseLabel || '等待处理' }}
+              当前阶段：{{ getPhaseDisplayLabel(activeNote) }}
             </p>
           </section>
         </div>
