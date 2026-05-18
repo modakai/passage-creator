@@ -498,11 +498,13 @@ async function handleCreate() {
  * 选择历史记录并恢复进度连接。
  */
 async function openHistory(note: AppRednoteItem) {
+  stopRealtime()
   taskId.value = note.taskId
-  applyNote(note)
+  activeNote.value = null
+  content.value = note.content ?? content.value
   syncTaskIdToRoute(note.taskId)
   await refreshActiveDetail()
-  if (note.status !== 'COMPLETED' && note.status !== 'FAILED') {
+  if (isRunning.value) {
     startRealtime(note.taskId)
   }
 }
