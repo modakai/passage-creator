@@ -3,6 +3,8 @@ package com.sakura.passage_creator.rednote.service;
 import com.sakura.passage_creator.creation.workflow.image.OpenAiImageGenerationClient;
 import com.sakura.passage_creator.creation.workflow.image.WorkflowImageData;
 import com.sakura.passage_creator.creation.workflow.image.WorkflowImageStorageService;
+import com.sakura.passage_creator.billing.api.AiBillingReservation;
+import com.sakura.passage_creator.billing.api.AiBillingService;
 import com.sakura.passage_creator.rednote.workflow.state.RednoteWorkflowState;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -30,18 +32,29 @@ public class RednoteImageGenerationService {
      */
     private final WorkflowImageStorageService imageStorageService;
 
+    /**
+     * AI 计费服务，rednote 图片按数据库中的图片模型固定成本逐张结算。
+     */
+    private final AiBillingService aiBillingService;
+
     public RednoteImageGenerationService(OpenAiImageGenerationClient imageGenerationClient,
-                                         WorkflowImageStorageService imageStorageService) {
+                                         WorkflowImageStorageService imageStorageService,
+                                         AiBillingService aiBillingService) {
         this.imageGenerationClient = imageGenerationClient;
         this.imageStorageService = imageStorageService;
+        this.aiBillingService = aiBillingService;
     }
 
     /**
      * 生成单张 rednote 图片并返回可持久化结果。
      */
-    public RednoteWorkflowState.RednoteImageResult generate(String taskId, String prompt, int position, String type) {
+    public RednoteWorkflowState.RednoteImageResult generate(String taskId, Long userId, String prompt, int position, String type) {
+        long startMillis = System.currentTimeMillis();
+        AiBillingReservation reservation = aiBillingService.reserveImageCall(userId, taskId,
+                "RednoteImageGenerationService", "IMAGE_GENERATING", "OPENAI", imageGenerationClient.getModel());
         try {
             String url = generateAndUpload(taskId, prompt);
+            aiBillingService.completeImageCall(reservation, resolveLatency(startMillis), true, null);
             return RednoteWorkflowState.RednoteImageResult.builder()
                     .position(position)
                     .type(type)
@@ -51,6 +64,7 @@ public class RednoteImageGenerationService {
                     .status("SUCCESS")
                     .build();
         } catch (RuntimeException e) {
+            aiBillingService.releaseReservation(reservation, resolveLatency(startMillis), e.getMessage());
             log.error("异常 ", e);
             return RednoteWorkflowState.RednoteImageResult.builder()
                     .position(position)
@@ -72,6 +86,13 @@ public class RednoteImageGenerationService {
         }
         WorkflowImageData imageData = imageGenerationClient.generateImage(prompt);
         return imageStorageService.uploadGeneratedImage(REDNOTE_BIZ_TYPE, taskId, imageData);
+    }
+
+    /**
+     * 计算图片模型调用耗时，避免超过 Integer 上限。
+     */
+    private Integer resolveLatency(long startMillis) {
+        return Math.toIntExact(Math.min(Integer.MAX_VALUE, System.currentTimeMillis() - startMillis));
     }
 
 }

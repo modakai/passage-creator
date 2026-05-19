@@ -38,6 +38,7 @@ public class RednoteNormalImageGenerateNodeHandler implements NodeAction {
     @Override
     public Map<String, Object> apply(OverAllState stateSnapshot) {
         String taskId = requiredString(stateSnapshot, RednoteWorkflowState.KEY_TASK_ID);
+        Long userId = requiredLong(stateSnapshot, RednoteWorkflowState.KEY_USER_ID);
         rednoteNotePersistenceService.markPhase(taskId,
                 RednoteStatusEnum.PROCESSING.getValue(),
                 RednotePhaseEnum.IMAGE_GENERATING.getValue());
@@ -45,6 +46,7 @@ public class RednoteNormalImageGenerateNodeHandler implements NodeAction {
         List<CompletableFuture<RednoteWorkflowState.RednoteImageResult>> futures = promptItems.stream()
                 .map(item -> CompletableFuture.supplyAsync(() -> rednoteImageGenerationService.generate(
                         taskId,
+                        userId,
                         item.getPrompt(),
                         item.getPosition(),
                         "NORMAL"
@@ -84,5 +86,19 @@ public class RednoteNormalImageGenerateNodeHandler implements NodeAction {
             throw new IllegalStateException("缺少 rednote workflow 状态：" + key);
         }
         return value.toString();
+    }
+
+    /**
+     * 读取必填 Long 状态。
+     */
+    private Long requiredLong(OverAllState stateSnapshot, String key) {
+        Object value = stateSnapshot.value(key).orElse(null);
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value != null && StringUtils.isNotBlank(value.toString())) {
+            return Long.parseLong(value.toString());
+        }
+        throw new IllegalStateException("缺少 rednote workflow 状态：" + key);
     }
 }

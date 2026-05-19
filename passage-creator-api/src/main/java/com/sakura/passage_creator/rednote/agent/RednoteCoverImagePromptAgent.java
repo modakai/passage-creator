@@ -6,12 +6,16 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.internal.node.Node;
+import com.sakura.passage_creator.rednote.agent.billing.RednoteBillingModelInterceptorFactory;
 import com.sakura.passage_creator.rednote.agent.hook.RednoteCoverImagePromptAgentHook;
 import com.sakura.passage_creator.rednote.constant.UniversalConstant;
+import com.sakura.passage_creator.rednote.model.enums.RednotePhaseEnum;
 import com.sakura.passage_creator.rednote.workflow.state.RednoteWorkflowState;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
  * 封面图提示词 Agent，负责生成封面短文案和最终封面图片提示词。
@@ -67,11 +71,13 @@ public class RednoteCoverImagePromptAgent {
     private final ReactAgent reactAgent;
 
     public RednoteCoverImagePromptAgent(DashScopeApi dashScopeApi,
-                                        RednoteCoverImagePromptAgentHook rednoteCoverImagePromptAgentHook) {
+                                        RednoteCoverImagePromptAgentHook rednoteCoverImagePromptAgentHook,
+                                        RednoteBillingModelInterceptorFactory billingInterceptorFactory) {
+        String model = DashScopeModel.ChatModel.QWEN3_MAX.value;
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
-                        .model(DashScopeModel.ChatModel.QWEN3_MAX.value)
+                        .model(model)
                         .temperature(0.2)
                         .maxToken(1800)
                         .topP(0.9)
@@ -89,6 +95,12 @@ public class RednoteCoverImagePromptAgent {
                         tags: {tags}
                         """)
                 .outputType(RednoteWorkflowState.CoverImagePromptResponse.class)
+                // 封面提示词文本调用独立计费，便于后台按 Agent 阶段追踪成本。
+                .interceptors(List.of(billingInterceptorFactory.createDashScopeTextInterceptor(
+                        UniversalConstant.REDNOTE_COVER_IMAGE_PROMPT_AGENT_NAME,
+                        RednotePhaseEnum.IMAGE_PROMPT_GENERATING.getValue(),
+                        model
+                )))
                 .hooks(rednoteCoverImagePromptAgentHook)
                 // 定义封面提示词输出名称，Hook 会读取该 key 并写入 rednote_note.cover_title 和 cover_prompt。
                 .outputKey(RednoteWorkflowState.KEY_COVER_IMAGE_PROMPT_RESPONSE)

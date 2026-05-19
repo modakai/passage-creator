@@ -7,14 +7,18 @@ import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.agent.interceptor.toolretry.ToolRetryInterceptor;
 import com.alibaba.cloud.ai.graph.internal.node.Node;
+import com.sakura.passage_creator.rednote.agent.billing.RednoteBillingModelInterceptorFactory;
 import com.sakura.passage_creator.rednote.agent.hook.RednoteSearchAgentHook;
 import com.sakura.passage_creator.rednote.agent.tool.search.RednoteUrlFetchTools;
 import com.sakura.passage_creator.rednote.agent.tool.search.RednoteWebSearchTools;
 import com.sakura.passage_creator.rednote.constant.UniversalConstant;
+import com.sakura.passage_creator.rednote.model.enums.RednotePhaseEnum;
 import com.sakura.passage_creator.rednote.workflow.state.RednoteWorkflowState;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
  * 小红书 SearchAgent，使用 ReActAgent 主动调用网页搜索工具并整理 RednoteBrief。
@@ -85,11 +89,13 @@ public class RednoteSearchAgent {
     public RednoteSearchAgent(DashScopeApi dashScopeApi,
                               RednoteWebSearchTools rednoteWebSearchTools,
                               RednoteUrlFetchTools rednoteUrlFetchTools,
-                              RednoteSearchAgentHook rednoteSearchAgentHook) {
+                              RednoteSearchAgentHook rednoteSearchAgentHook,
+                              RednoteBillingModelInterceptorFactory billingInterceptorFactory) {
+        String model = DashScopeModel.ChatModel.QWEN3_MAX.value;
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
-                        .model(DashScopeModel.ChatModel.QWEN3_MAX.value)
+                        .model(model)
                         .temperature(0.1)
                         .maxToken(3000)
                         .topP(0.9)
@@ -103,14 +109,22 @@ public class RednoteSearchAgent {
                 .instruction("用户需求：{content}")
                 .outputType(RednoteWorkflowState.SearchResponse.class)
                 .methodTools(rednoteWebSearchTools, rednoteUrlFetchTools)
-                // 搜索工具属于外部 I/O，使用 Alibaba 内置 ToolRetryInterceptor 做短暂重试和错误消息回传。
-                .interceptors(ToolRetryInterceptor.builder()
-                        .toolName(UniversalConstant.SEARCH_TOOL_NAME)
-                        .maxRetries(2)
-                        .initialDelay(500)
-                        .maxDelay(3000)
-                        .onFailure(ToolRetryInterceptor.OnFailureBehavior.RETURN_MESSAGE)
-                        .build())
+                // 文本模型调用由 ModelInterceptor 负责预扣、真实 token 结算和失败释放。
+                .interceptors(List.of(
+                        billingInterceptorFactory.createDashScopeTextInterceptor(
+                                UniversalConstant.SEARCH_AGENT_NAME,
+                                RednotePhaseEnum.SEARCH_AGENT.getValue(),
+                                model
+                        ),
+                        // 搜索工具属于外部 I/O，使用 Alibaba 内置 ToolRetryInterceptor 做短暂重试和错误消息回传。
+                        ToolRetryInterceptor.builder()
+                                .toolName(UniversalConstant.SEARCH_TOOL_NAME)
+                                .maxRetries(2)
+                                .initialDelay(500)
+                                .maxDelay(3000)
+                                .onFailure(ToolRetryInterceptor.OnFailureBehavior.RETURN_MESSAGE)
+                                .build()
+                ))
                 .hooks(rednoteSearchAgentHook)
                 // 定义Agent的输出名称，可以在state中读取
                 .outputKey(RednoteWorkflowState.SEARCH_OUTPUT_KEY)

@@ -6,12 +6,16 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.internal.node.Node;
+import com.sakura.passage_creator.rednote.agent.billing.RednoteBillingModelInterceptorFactory;
 import com.sakura.passage_creator.rednote.agent.hook.RednoteContentAgentHook;
 import com.sakura.passage_creator.rednote.constant.UniversalConstant;
+import com.sakura.passage_creator.rednote.model.enums.RednotePhaseEnum;
 import com.sakura.passage_creator.rednote.workflow.state.RednoteWorkflowState;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
  * 小红书文案 Agent，基于 RednoteBrief 生成结构化正文和标签。
@@ -70,11 +74,13 @@ public class RednoteContentAgent {
     private final ReactAgent reactAgent;
 
     public RednoteContentAgent(DashScopeApi dashScopeApi,
-                               RednoteContentAgentHook rednoteContentAgentHook) {
+                               RednoteContentAgentHook rednoteContentAgentHook,
+                               RednoteBillingModelInterceptorFactory billingInterceptorFactory) {
+        String model = DashScopeModel.ChatModel.QWEN3_MAX.value;
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
-                        .model(DashScopeModel.ChatModel.QWEN3_MAX.value)
+                        .model(model)
                         .temperature(0.1)
                         .maxToken(3000)
                         .topP(0.9)
@@ -96,6 +102,12 @@ public class RednoteContentAgent {
                         searchResults: {searchResults}
                         """)
                 .outputType(RednoteWorkflowState.ContentResponse.class)
+                // 文案生成按真实 token 用量结算，失败时释放预扣积分。
+                .interceptors(List.of(billingInterceptorFactory.createDashScopeTextInterceptor(
+                        UniversalConstant.REDNOTE_CONTENT_AGENT_NAME,
+                        RednotePhaseEnum.COPY_GENERATING.getValue(),
+                        model
+                )))
                 .hooks(rednoteContentAgentHook)
                 // 定义 ContentAgent 的输出名称，Hook 会读取该 key 并写入 rednote_note。
                 .outputKey(RednoteWorkflowState.KEY_COPYWRITING)

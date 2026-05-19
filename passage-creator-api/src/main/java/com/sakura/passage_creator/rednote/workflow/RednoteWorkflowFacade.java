@@ -125,8 +125,9 @@ public class RednoteWorkflowFacade {
             }
             CompiledGraph graph = graphFactory.compile(new RednoteWorkflowLifecycleListener(taskId));
             RunnableConfig config = resume
-                    ? RunnableConfig.builder().threadId(taskId).resume().build()
-                    : RunnableConfig.builder().threadId(taskId).build();
+                    // Rednote 计费需要同步 ChatResponse 才能读取 token usage，禁用 Agent 默认流式模型调用。
+                    ? RunnableConfig.builder().threadId(taskId).resume().addMetadata("_stream_", false).build()
+                    : RunnableConfig.builder().threadId(taskId).addMetadata("_stream_", false).build();
             Map<String, Object> input = resume ? Map.of() : WorkflowContext.fromJson(task.getContextJson()).getValues();
             NodeOutput output = graph.invokeAndGetOutput(input, config)
                     .orElseThrow(() -> new IllegalStateException("小红书 workflow 没有返回执行结果"));

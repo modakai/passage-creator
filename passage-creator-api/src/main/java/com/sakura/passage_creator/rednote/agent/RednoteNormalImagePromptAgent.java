@@ -6,12 +6,16 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.internal.node.Node;
+import com.sakura.passage_creator.rednote.agent.billing.RednoteBillingModelInterceptorFactory;
 import com.sakura.passage_creator.rednote.agent.hook.RednoteNormalImagePromptAgentHook;
 import com.sakura.passage_creator.rednote.constant.UniversalConstant;
+import com.sakura.passage_creator.rednote.model.enums.RednotePhaseEnum;
 import com.sakura.passage_creator.rednote.workflow.state.RednoteWorkflowState;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
  * 普通配图提示词 Agent，负责把小红书正文转换为最多 5 条文生图提示词。
@@ -74,11 +78,13 @@ public class RednoteNormalImagePromptAgent {
     private final ReactAgent reactAgent;
 
     public RednoteNormalImagePromptAgent(DashScopeApi dashScopeApi,
-                                         RednoteNormalImagePromptAgentHook rednoteNormalImagePromptAgentHook) {
+                                         RednoteNormalImagePromptAgentHook rednoteNormalImagePromptAgentHook,
+                                         RednoteBillingModelInterceptorFactory billingInterceptorFactory) {
+        String model = DashScopeModel.ChatModel.QWEN3_MAX.value;
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
-                        .model(DashScopeModel.ChatModel.QWEN3_MAX.value)
+                        .model(model)
                         .temperature(0.2)
                         .maxToken(2200)
                         .topP(0.9)
@@ -97,6 +103,12 @@ public class RednoteNormalImagePromptAgent {
                         imageCount: {imageCount}
                         """)
                 .outputType(RednoteWorkflowState.NormalImagePromptResponse.class)
+                // 普通配图提示词也是文本模型调用，统一走 rednote 文本计费拦截器。
+                .interceptors(List.of(billingInterceptorFactory.createDashScopeTextInterceptor(
+                        UniversalConstant.REDNOTE_NORMAL_IMAGE_PROMPT_AGENT_NAME,
+                        RednotePhaseEnum.IMAGE_PROMPT_GENERATING.getValue(),
+                        model
+                )))
                 .hooks(rednoteNormalImagePromptAgentHook)
                 // 定义普通配图提示词输出名称，Hook 会读取该 key 并写入 rednote_note.image_prompts。
                 .outputKey(RednoteWorkflowState.KEY_NORMAL_IMAGE_PROMPT_RESPONSE)
