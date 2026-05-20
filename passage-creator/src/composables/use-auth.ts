@@ -8,6 +8,7 @@ import {
   canAccessAdmin,
   getDefaultRedirectPath,
   getLoginRoute,
+  isSafePostLoginRedirect,
 } from '@/utils/auth-routing'
 import { buildAuthSessionFromLoginUser } from '@/utils/auth-session'
 
@@ -50,8 +51,8 @@ export function useAuth() {
 
       authStore.setSession(nextSession)
       const redirect = router.currentRoute.value.query.redirect as string | undefined
-      // 登录页统一后，避免普通用户因后台 redirect 被送进无权限页面。
-      if (redirect && !redirect.startsWith('//') && (!redirect.startsWith('/dashboard') || canAccessAdmin(nextSession))) {
+      // 登录页统一后，避免普通用户因后台 redirect 被送进无权限页面或错误页循环。
+      if (isSafePostLoginRedirect(redirect) && (!redirect.startsWith('/dashboard') || canAccessAdmin(nextSession))) {
         await router.push(redirect)
         return
       }

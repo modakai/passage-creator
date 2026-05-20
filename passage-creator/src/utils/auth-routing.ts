@@ -27,6 +27,8 @@ export interface GuardMeta {
   authEntry?: AuthEntry
 }
 
+const AUTH_FLOW_REDIRECT_PREFIXES = ['/auth', '/errors']
+
 // 提供统一的游客态结构，供 store 初始化和守卫逻辑复用。
 export function createGuestSession(): AuthSession {
   return {
@@ -54,6 +56,18 @@ export function getDefaultRedirectPath(session: AuthSession): string {
 export function getLoginRoute(_section: 'user' | 'admin' = 'user'): string {
   // 前台与后台统一使用同一个登录路由，登录后再按角色分流。
   return '/auth/sign-in'
+}
+
+// 登录后只允许回到站内业务页面，避免回跳到登录页或错误页造成循环。
+export function isSafePostLoginRedirect(redirect: string | undefined): redirect is string {
+  if (!redirect || !redirect.startsWith('/') || redirect.startsWith('//')) {
+    return false
+  }
+
+  return !AUTH_FLOW_REDIRECT_PREFIXES.some((prefix) => {
+    // 前缀自身、子路径和带查询参数的认证流页面都不能作为业务回跳目标。
+    return redirect === prefix || redirect.startsWith(`${prefix}/`) || redirect.startsWith(`${prefix}?`)
+  })
 }
 
 // 用纯函数统一表达守卫跳转规则，便于测试和路由复用。

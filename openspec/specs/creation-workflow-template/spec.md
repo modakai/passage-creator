@@ -1,8 +1,6 @@
 ## Purpose
 定义基于 Spring AI Alibaba StateGraph 的文章创作 workflow，以及 Human-in-the-Loop、Redis checkpoint TTL、过期恢复和未来 `rednote` 创作类型预留规则。
-
 ## Requirements
-
 ### Requirement: Article workflow is orchestrated by Spring AI Alibaba StateGraph
 The system SHALL execute article creation through a Spring AI Alibaba `StateGraph` compiled into `CompiledGraph`.
 
@@ -95,3 +93,41 @@ The system SHALL reserve the persisted creation type value `rednote` for future 
 #### Scenario: Rednote naming is reserved
 - **WHEN** future rednote creation is implemented
 - **THEN** the system uses `rednote` as the persisted value and `REDNOTE` as the Java enum constant if an enum is used
+
+### Requirement: Article workflow exposes optional prompt feedback anchors
+The system SHALL expose optional prompt feedback anchors at title selection, outline editing, and content merged stages without changing workflow resume semantics.
+
+#### Scenario: Title selection exposes feedback anchor
+- **WHEN** the title generation node completes and the article workflow enters title selection
+- **THEN** the frontend can present an optional `TITLE_SELECTION` prompt feedback entry associated with the current workflow task
+
+#### Scenario: Outline editing exposes feedback anchor
+- **WHEN** the outline generation node completes and the article workflow enters outline editing
+- **THEN** the frontend can present an optional `OUTLINE_EDITING` prompt feedback entry associated with the current workflow task
+
+#### Scenario: Content merged exposes feedback anchor
+- **WHEN** the content merge node completes and the article workflow reaches merged content output
+- **THEN** the frontend can present an optional `CONTENT_MERGED` prompt feedback entry associated with the current workflow task
+
+#### Scenario: Rednote completion exposes feedback anchor
+- **WHEN** rednote full-auto generation is complete
+- **THEN** the frontend can present one optional prompt feedback entry associated with `REDNOTE_CONTENT`, `REDNOTE_NORMAL_IMAGE_PROMPT`, and `REDNOTE_COVER_IMAGE_PROMPT`
+
+#### Scenario: Feedback skip does not affect workflow state
+- **WHEN** a user skips, closes, or ignores an optional prompt feedback entry
+- **THEN** the article workflow state and human task completion rules remain unchanged
+
+### Requirement: Rednote workflow reuses shared workflow infrastructure independently
+The system SHALL allow `rednote` creation workflows to reuse shared workflow task, checkpoint, and event infrastructure while keeping business graph and business storage independent from article workflows.
+
+#### Scenario: Rednote task uses shared workflow task table
+- **WHEN** a rednote creation task starts
+- **THEN** the system records the workflow in `workflow_task` with `biz_type = rednote`
+
+#### Scenario: Rednote graph is independent from article graph
+- **WHEN** the system executes a rednote creation workflow
+- **THEN** it SHALL use a rednote-specific StateGraph instead of adding rednote branches to the article StateGraph
+
+#### Scenario: Rednote business result is not stored only in workflow context
+- **WHEN** rednote workflow nodes produce business output
+- **THEN** the system SHALL persist rednote business output in rednote-owned storage and use workflow context only as execution state snapshot

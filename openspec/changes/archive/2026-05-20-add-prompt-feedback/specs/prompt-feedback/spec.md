@@ -15,6 +15,11 @@
 - **WHEN** 已登录用户在正文融合完成后提交 `CONTENT_MERGED` 环节反馈
 - **THEN** 系统记录该反馈并允许管理端按正文融合完成环节查询和统计
 
+#### Scenario: rednote 完成后一次提交三类 Prompt 反馈
+- **WHEN** 已登录用户在 rednote 全自动生成完成后选择满意度反馈
+- **THEN** 前端 SHALL 分别提交 `REDNOTE_CONTENT`、`REDNOTE_NORMAL_IMAGE_PROMPT` 和 `REDNOTE_COVER_IMAGE_PROMPT` 三个反馈环节
+- **AND** 系统 SHALL 分别关联 `rednote.content.system`、`rednote.normal-image-prompt.system` 和 `rednote.cover-image-prompt.system` 对应的 Prompt 使用日志
+
 ### Requirement: 提示词反馈是非强制的
 系统 MUST NOT 要求用户必须填写提示词反馈才能继续或完成创作流程。
 
@@ -49,6 +54,10 @@
 - **WHEN** 用户分别提交标题、大纲和正文融合三个环节反馈
 - **THEN** 系统分别保存三个环节的有效反馈记录
 
+#### Scenario: rednote 同一次反馈保存为三个模板记录
+- **WHEN** 用户对同一个 rednote 任务完成态提交一次反馈
+- **THEN** 系统按三个 rednote Prompt 环节分别保存有效反馈记录，且每条记录只关联一个 Prompt 模板快照
+
 ### Requirement: 管理员可以查询提示词反馈记录
 系统 SHALL 为管理员提供提示词反馈记录分页查询能力，并 MUST 要求管理员权限。
 
@@ -57,7 +66,7 @@
 - **THEN** 系统返回反馈 ID、用户信息、创作任务 ID、反馈环节、评价结果、备注、提示词模板标识、版本和时间信息
 
 #### Scenario: 管理员按环节筛选反馈
-- **WHEN** 管理员按 `TITLE_SELECTION`、`OUTLINE_EDITING` 或 `CONTENT_MERGED` 筛选反馈记录
+- **WHEN** 管理员按文章环节或 rednote Prompt 环节筛选反馈记录
 - **THEN** 系统仅返回对应环节的反馈记录
 
 #### Scenario: 非管理员不能访问反馈记录

@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 
 import Error from '@/components/custom-error.vue'
 import { RouterPath } from '@/constants/route-path'
+import { isSafePostLoginRedirect } from '@/utils/auth-routing'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -18,7 +19,8 @@ const errorMessage = computed(() => {
 // 登录按钮固定指向用户端登录页，并透传原始跳转目标。
 const loginTarget = computed(() => {
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : undefined
-  return redirect
+  // 错误页或登录页不能作为登录后回跳目标，否则会形成 401 -> 登录 -> 401 的循环。
+  return isSafePostLoginRedirect(redirect)
     ? { path: String(RouterPath.USER_LOGIN), query: { redirect } }
     : { path: String(RouterPath.USER_LOGIN) }
 })

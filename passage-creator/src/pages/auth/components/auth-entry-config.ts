@@ -19,7 +19,8 @@ export interface AuthEntryConfig {
 const AUTH_ENTRY_CONFIG_MAP: Record<AuthEntry, AuthEntryConfig> = {
   user: {
     entry: 'user',
-    defaultAccount: 'student@example.com',
+    // 登录页默认填充的体验账号，与初始化管理员账号保持一致。
+    defaultAccount: 'sakura',
     redirectPath: '/',
     titleKey: 'pages.authPortal.user.title',
     descriptionKey: 'pages.authPortal.user.description',
@@ -35,7 +36,8 @@ const AUTH_ENTRY_CONFIG_MAP: Record<AuthEntry, AuthEntryConfig> = {
   },
   admin: {
     entry: 'admin',
-    defaultAccount: 'admin@example.com',
+    // 登录页默认填充的体验账号，与初始化管理员账号保持一致。
+    defaultAccount: 'sakura',
     redirectPath: '/dashboard',
     titleKey: 'pages.authPortal.admin.title',
     descriptionKey: 'pages.authPortal.admin.description',

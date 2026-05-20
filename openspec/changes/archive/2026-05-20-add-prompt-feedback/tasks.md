@@ -22,6 +22,7 @@
 - [x] 3.3 在标题生成完毕待选择阶段展示 `TITLE_SELECTION` 反馈入口，且不阻塞标题选择
 - [x] 3.4 在大纲生成完毕待编辑阶段展示 `OUTLINE_EDITING` 反馈入口，且不阻塞大纲编辑和确认
 - [x] 3.5 在正文融合完成阶段展示 `CONTENT_MERGED` 反馈入口，且不阻塞最终内容查看或保存结果展示
+- [x] 3.5.1 在 rednote 生成完成后展示同款反馈入口，一次点击同步提交 `REDNOTE_CONTENT`、`REDNOTE_NORMAL_IMAGE_PROMPT`、`REDNOTE_COVER_IMAGE_PROMPT`
 - [x] 3.6 确保同一环节反馈提交成功后当前页面不重复打扰用户
 
 ## 4. 管理后台反馈记录与统计

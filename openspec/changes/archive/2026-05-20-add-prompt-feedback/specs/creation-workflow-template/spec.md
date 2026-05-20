@@ -15,6 +15,10 @@ The system SHALL expose optional prompt feedback anchors at title selection, out
 - **WHEN** the content merge node completes and the article workflow reaches merged content output
 - **THEN** the frontend can present an optional `CONTENT_MERGED` prompt feedback entry associated with the current workflow task
 
+#### Scenario: Rednote completion exposes feedback anchor
+- **WHEN** rednote full-auto generation is complete
+- **THEN** the frontend can present one optional prompt feedback entry associated with `REDNOTE_CONTENT`, `REDNOTE_NORMAL_IMAGE_PROMPT`, and `REDNOTE_COVER_IMAGE_PROMPT`
+
 #### Scenario: Feedback skip does not affect workflow state
 - **WHEN** a user skips, closes, or ignores an optional prompt feedback entry
 - **THEN** the article workflow state and human task completion rules remain unchanged
