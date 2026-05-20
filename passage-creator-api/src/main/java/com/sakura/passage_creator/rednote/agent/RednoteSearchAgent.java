@@ -7,8 +7,13 @@ import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.agent.interceptor.toolretry.ToolRetryInterceptor;
 import com.alibaba.cloud.ai.graph.internal.node.Node;
+import com.sakura.passage_creator.prompt.api.PromptTemplateRenderResult;
+import com.sakura.passage_creator.prompt.api.PromptTemplateService;
+import com.sakura.passage_creator.prompt.api.PromptUsageLogService;
+import com.sakura.passage_creator.rednote.agent.billing.RednotePromptUsageModelInterceptor;
 import com.sakura.passage_creator.rednote.agent.billing.RednoteBillingModelInterceptorFactory;
 import com.sakura.passage_creator.rednote.agent.hook.RednoteSearchAgentHook;
+import com.sakura.passage_creator.rednote.constant.RednotePromptConstant;
 import com.sakura.passage_creator.rednote.agent.tool.search.RednoteUrlFetchTools;
 import com.sakura.passage_creator.rednote.agent.tool.search.RednoteWebSearchTools;
 import com.sakura.passage_creator.rednote.constant.UniversalConstant;
@@ -28,9 +33,9 @@ import java.util.List;
 public class RednoteSearchAgent {
 
     /**
-     * SearchAgent 的固定系统提示词；动态 Prompt 和模板版本管理后续再接入。
+     * SearchAgent 的默认系统提示词，运行时未配置 ACTIVE 模板时作为兜底内容。
      */
-    private static final String SYSTEM_PROMPT = """
+    public static final String SYSTEM_PROMPT = """
             你是小红书爆款创作流程中的 SearchAgent。
             你的第一职责是必须调用 rednote_web_search 工具做网页搜索，然后把用户需求和搜索结果整理成 RednoteBrief。
             在调用 rednote_web_search 工具前，请先理解用户的语义。
@@ -84,14 +89,42 @@ public class RednoteSearchAgent {
             ```
             """;
 
-    private final ReactAgent reactAgent;
+    private final DashScopeApi dashScopeApi;
+
+    private final RednoteWebSearchTools rednoteWebSearchTools;
+
+    private final RednoteUrlFetchTools rednoteUrlFetchTools;
+
+    private final RednoteSearchAgentHook rednoteSearchAgentHook;
+
+    private final RednoteBillingModelInterceptorFactory billingInterceptorFactory;
+
+    private final PromptTemplateService promptTemplateService;
+
+    private final PromptUsageLogService promptUsageLogService;
 
     public RednoteSearchAgent(DashScopeApi dashScopeApi,
                               RednoteWebSearchTools rednoteWebSearchTools,
                               RednoteUrlFetchTools rednoteUrlFetchTools,
                               RednoteSearchAgentHook rednoteSearchAgentHook,
-                              RednoteBillingModelInterceptorFactory billingInterceptorFactory) {
+                              RednoteBillingModelInterceptorFactory billingInterceptorFactory,
+                              PromptTemplateService promptTemplateService,
+                              PromptUsageLogService promptUsageLogService) {
+        this.dashScopeApi = dashScopeApi;
+        this.rednoteWebSearchTools = rednoteWebSearchTools;
+        this.rednoteUrlFetchTools = rednoteUrlFetchTools;
+        this.rednoteSearchAgentHook = rednoteSearchAgentHook;
+        this.billingInterceptorFactory = billingInterceptorFactory;
+        this.promptTemplateService = promptTemplateService;
+        this.promptUsageLogService = promptUsageLogService;
+    }
+
+    private ReactAgent buildAgent() {
         String model = DashScopeModel.ChatModel.QWEN3_MAX.value;
+        PromptTemplateRenderResult systemPrompt = promptTemplateService.resolveActiveRaw(
+                RednotePromptConstant.SEARCH_SYSTEM_KEY, SYSTEM_PROMPT);
+        PromptTemplateRenderResult userPrompt = promptTemplateService.resolveActiveRaw(
+                RednotePromptConstant.SEARCH_USER_KEY, RednotePromptConstant.SEARCH_USER_PROMPT);
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
@@ -101,12 +134,12 @@ public class RednoteSearchAgent {
                         .topP(0.9)
                         .build())
                 .build();
-        this.reactAgent = ReactAgent.builder()
+        return ReactAgent.builder()
                 .name(UniversalConstant.SEARCH_AGENT_NAME)
                 .description("搜索网页并整理小红书创作简报")
                 .model(chatModel)
-                .systemPrompt(SYSTEM_PROMPT)
-                .instruction("用户需求：{content}")
+                .systemPrompt(systemPrompt.content())
+                .instruction(userPrompt.content())
                 .outputType(RednoteWorkflowState.SearchResponse.class)
                 .methodTools(rednoteWebSearchTools, rednoteUrlFetchTools)
                 // 文本模型调用由 ModelInterceptor 负责预扣、真实 token 结算和失败释放。
@@ -116,6 +149,8 @@ public class RednoteSearchAgent {
                                 RednotePhaseEnum.SEARCH_AGENT.getValue(),
                                 model
                         ),
+                        new RednotePromptUsageModelInterceptor(promptUsageLogService,
+                                UniversalConstant.SEARCH_AGENT_NAME, List.of(systemPrompt, userPrompt)),
                         // 搜索工具属于外部 I/O，使用 Alibaba 内置 ToolRetryInterceptor 做短暂重试和错误消息回传。
                         ToolRetryInterceptor.builder()
                                 .toolName(UniversalConstant.SEARCH_TOOL_NAME)
@@ -133,10 +168,10 @@ public class RednoteSearchAgent {
     }
 
     public String name() {
-        return reactAgent.name();
+        return UniversalConstant.SEARCH_AGENT_NAME;
     }
 
     public Node asNode() {
-        return reactAgent.asNode(true, false);
+        return buildAgent().asNode(true, false);
     }
 }

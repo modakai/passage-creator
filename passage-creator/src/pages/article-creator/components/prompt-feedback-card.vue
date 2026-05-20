@@ -11,7 +11,8 @@ import { submitPromptFeedback } from '@/services/api/prompt-template.api'
  */
 const props = defineProps<{
   taskId: string
-  stage: PromptFeedbackStage
+  stage?: PromptFeedbackStage
+  stages?: PromptFeedbackStage[]
   title: string
   description?: string
 }>()
@@ -76,7 +77,13 @@ const isSubmitting = ref(false)
  */
 const isSubmitted = ref(false)
 
-watch(() => [props.taskId, props.stage] as const, () => {
+const targetFeedbackStages = computed(() => {
+  // rednote 完成态一次提交多个 Prompt 环节，article 仍保持单环节提交。
+  const stages = props.stages?.length ? props.stages : (props.stage ? [props.stage] : [])
+  return Array.from(new Set(stages))
+})
+
+watch(() => [props.taskId, props.stage, props.stages?.join('|')] as const, () => {
   // 切换任务或反馈环节时，重新展示当前环节自己的弱提示。
   selectedRating.value = null
   isDismissed.value = false
@@ -88,7 +95,7 @@ watch(() => [props.taskId, props.stage] as const, () => {
  * 用户选择评价后立即提交，不再要求手写 rating 或备注。
  */
 async function selectRating(rating: PromptFeedbackRating) {
-  if (isSubmitting.value || !props.taskId) {
+  if (isSubmitting.value || !props.taskId || targetFeedbackStages.value.length === 0) {
     return
   }
   selectedRating.value = rating
@@ -106,16 +113,18 @@ function dismissFeedback() {
  * 提交反馈；失败只提示，不改变创作流程状态。
  */
 async function handleSubmit() {
-  if (!props.taskId || !selectedRating.value) {
+  if (!props.taskId || !selectedRating.value || targetFeedbackStages.value.length === 0) {
     return
   }
   isSubmitting.value = true
   try {
-    await submitPromptFeedback({
-      taskId: props.taskId,
-      feedbackStage: props.stage,
-      rating: selectedRating.value,
-    })
+    await Promise.all(targetFeedbackStages.value.map(feedbackStage =>
+      submitPromptFeedback({
+        taskId: props.taskId,
+        feedbackStage,
+        rating: selectedRating.value!,
+      }),
+    ))
     isSubmitted.value = true
     toast.success('反馈已记录')
   }

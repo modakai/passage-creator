@@ -22,7 +22,7 @@ public class PromptFeedbackVO implements Serializable {
     private Long userId;
 
     /**
-     * 文章创作任务 id。
+     * 创作任务 id，兼容 article 和 rednote 任务。
      */
     private String taskId;
 

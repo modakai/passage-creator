@@ -39,6 +39,7 @@ declare global {
   const buildSettingsNavItems: typeof import('../composables/use-sidebar').buildSettingsNavItems
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
+  const creationNavItems: typeof import('../constants/user-portal').creationNavItems
   const customRef: typeof import('vue').customRef
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
   const defineComponent: typeof import('vue').defineComponent

@@ -312,8 +312,8 @@ create table if not exists public.prompt_feedback
 );
 comment on table public.prompt_feedback is 'Prompt 反馈表';
 comment on column public.prompt_feedback.user_id is '提交反馈的用户 id';
-comment on column public.prompt_feedback.task_id is '文章创作任务 id';
-comment on column public.prompt_feedback.feedback_stage is '反馈环节：TITLE_SELECTION/OUTLINE_EDITING/CONTENT_MERGED';
+comment on column public.prompt_feedback.task_id is '创作任务 id';
+comment on column public.prompt_feedback.feedback_stage is '反馈环节：文章三环节或 rednote 三个终态 Prompt 环节';
 comment on column public.prompt_feedback.rating is '评价结果：VERY_SATISFIED/SATISFIED/NEUTRAL/UNSATISFIED';
 comment on column public.prompt_feedback.remark is '用户可选填写的文字说明';
 comment on column public.prompt_feedback.prompt_usage_log_id is '关联的 Prompt 使用日志 id';

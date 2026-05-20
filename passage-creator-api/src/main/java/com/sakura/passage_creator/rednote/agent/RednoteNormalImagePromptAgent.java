@@ -6,8 +6,13 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.internal.node.Node;
+import com.sakura.passage_creator.prompt.api.PromptTemplateRenderResult;
+import com.sakura.passage_creator.prompt.api.PromptTemplateService;
+import com.sakura.passage_creator.prompt.api.PromptUsageLogService;
 import com.sakura.passage_creator.rednote.agent.billing.RednoteBillingModelInterceptorFactory;
+import com.sakura.passage_creator.rednote.agent.billing.RednotePromptUsageModelInterceptor;
 import com.sakura.passage_creator.rednote.agent.hook.RednoteNormalImagePromptAgentHook;
+import com.sakura.passage_creator.rednote.constant.RednotePromptConstant;
 import com.sakura.passage_creator.rednote.constant.UniversalConstant;
 import com.sakura.passage_creator.rednote.model.enums.RednotePhaseEnum;
 import com.sakura.passage_creator.rednote.workflow.state.RednoteWorkflowState;
@@ -27,7 +32,7 @@ public class RednoteNormalImagePromptAgent {
     /**
      * 普通配图提示词系统提示词，强调中文关键词和数量上限。
      */
-    private static final String SYSTEM_PROMPT = """
+    public static final String SYSTEM_PROMPT = """
             # Role: 中文文生图提示词创作大师（Chinese Text-to-Image Prompt Creation Master）
             
             # Profile:
@@ -75,12 +80,34 @@ public class RednoteNormalImagePromptAgent {
             }
             """;
 
-    private final ReactAgent reactAgent;
+    private final DashScopeApi dashScopeApi;
+
+    private final RednoteNormalImagePromptAgentHook rednoteNormalImagePromptAgentHook;
+
+    private final RednoteBillingModelInterceptorFactory billingInterceptorFactory;
+
+    private final PromptTemplateService promptTemplateService;
+
+    private final PromptUsageLogService promptUsageLogService;
 
     public RednoteNormalImagePromptAgent(DashScopeApi dashScopeApi,
                                          RednoteNormalImagePromptAgentHook rednoteNormalImagePromptAgentHook,
-                                         RednoteBillingModelInterceptorFactory billingInterceptorFactory) {
+                                         RednoteBillingModelInterceptorFactory billingInterceptorFactory,
+                                         PromptTemplateService promptTemplateService,
+                                         PromptUsageLogService promptUsageLogService) {
+        this.dashScopeApi = dashScopeApi;
+        this.rednoteNormalImagePromptAgentHook = rednoteNormalImagePromptAgentHook;
+        this.billingInterceptorFactory = billingInterceptorFactory;
+        this.promptTemplateService = promptTemplateService;
+        this.promptUsageLogService = promptUsageLogService;
+    }
+
+    private ReactAgent buildAgent() {
         String model = DashScopeModel.ChatModel.QWEN3_MAX.value;
+        PromptTemplateRenderResult systemPrompt = promptTemplateService.resolveActiveRaw(
+                RednotePromptConstant.NORMAL_IMAGE_PROMPT_SYSTEM_KEY, SYSTEM_PROMPT);
+        PromptTemplateRenderResult userPrompt = promptTemplateService.resolveActiveRaw(
+                RednotePromptConstant.NORMAL_IMAGE_PROMPT_USER_KEY, RednotePromptConstant.NORMAL_IMAGE_PROMPT_USER_PROMPT);
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
@@ -90,25 +117,24 @@ public class RednoteNormalImagePromptAgent {
                         .topP(0.9)
                         .build())
                 .build();
-        this.reactAgent = ReactAgent.builder()
+        return ReactAgent.builder()
                 .name(UniversalConstant.REDNOTE_NORMAL_IMAGE_PROMPT_AGENT_NAME)
                 .description("生成小红书普通配图提示词列表")
                 .model(chatModel)
-                .systemPrompt(SYSTEM_PROMPT)
-                .instruction("""
-                        请基于以下小红书内容生成普通配图提示词：
-                        subject: {subject}
-                        bodyContent: {bodyContent}
-                        tags: {tags}
-                        imageCount: {imageCount}
-                        """)
+                .systemPrompt(systemPrompt.content())
+                .instruction(userPrompt.content())
                 .outputType(RednoteWorkflowState.NormalImagePromptResponse.class)
                 // 普通配图提示词也是文本模型调用，统一走 rednote 文本计费拦截器。
-                .interceptors(List.of(billingInterceptorFactory.createDashScopeTextInterceptor(
-                        UniversalConstant.REDNOTE_NORMAL_IMAGE_PROMPT_AGENT_NAME,
-                        RednotePhaseEnum.IMAGE_PROMPT_GENERATING.getValue(),
-                        model
-                )))
+                .interceptors(List.of(
+                        billingInterceptorFactory.createDashScopeTextInterceptor(
+                                UniversalConstant.REDNOTE_NORMAL_IMAGE_PROMPT_AGENT_NAME,
+                                RednotePhaseEnum.IMAGE_PROMPT_GENERATING.getValue(),
+                                model
+                        ),
+                        new RednotePromptUsageModelInterceptor(promptUsageLogService,
+                                UniversalConstant.REDNOTE_NORMAL_IMAGE_PROMPT_AGENT_NAME,
+                                List.of(systemPrompt, userPrompt))
+                ))
                 .hooks(rednoteNormalImagePromptAgentHook)
                 // 定义普通配图提示词输出名称，Hook 会读取该 key 并写入 rednote_note.image_prompts。
                 .outputKey(RednoteWorkflowState.KEY_NORMAL_IMAGE_PROMPT_RESPONSE)
@@ -117,10 +143,10 @@ public class RednoteNormalImagePromptAgent {
     }
 
     public String name() {
-        return reactAgent.name();
+        return UniversalConstant.REDNOTE_NORMAL_IMAGE_PROMPT_AGENT_NAME;
     }
 
     public Node asNode() {
-        return reactAgent.asNode(true, false);
+        return buildAgent().asNode(true, false);
     }
 }

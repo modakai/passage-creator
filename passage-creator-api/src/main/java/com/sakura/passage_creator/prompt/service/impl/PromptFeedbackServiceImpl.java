@@ -55,6 +55,21 @@ public class PromptFeedbackServiceImpl extends ServiceImpl<PromptFeedbackMapper,
     private static final String CONTENT_USER_TEMPLATE_KEY = "article.content.user";
 
     /**
+     * 小红书文案反馈只关联文案系统 Prompt。
+     */
+    private static final String REDNOTE_CONTENT_SYSTEM_TEMPLATE_KEY = "rednote.content.system";
+
+    /**
+     * 小红书普通配图反馈只关联普通配图系统 Prompt。
+     */
+    private static final String REDNOTE_NORMAL_IMAGE_PROMPT_SYSTEM_TEMPLATE_KEY = "rednote.normal-image-prompt.system";
+
+    /**
+     * 小红书封面图反馈只关联封面图系统 Prompt。
+     */
+    private static final String REDNOTE_COVER_IMAGE_PROMPT_SYSTEM_TEMPLATE_KEY = "rednote.cover-image-prompt.system";
+
+    /**
      * 备注最大长度，防止管理端展示和数据库写入被大文本拖垮。
      */
     private static final int MAX_REMARK_LENGTH = 1000;
@@ -260,7 +275,7 @@ public class PromptFeedbackServiceImpl extends ServiceImpl<PromptFeedbackMapper,
     /**
      * 按反馈环节解析优先关联的模板标识集合。
      */
-    private Set<String> templateKeysForStage(String feedbackStage) {
+    protected Set<String> templateKeysForStage(String feedbackStage) {
         PromptFeedbackStageEnum stage = PromptFeedbackStageEnum.of(feedbackStage);
         if (stage == null) {
             return Set.of();
@@ -269,6 +284,9 @@ public class PromptFeedbackServiceImpl extends ServiceImpl<PromptFeedbackMapper,
             case TITLE_SELECTION -> Set.of(TITLE_USER_TEMPLATE_KEY, "article.title.system");
             case OUTLINE_EDITING -> Set.of(OUTLINE_USER_TEMPLATE_KEY, "article.outline.system");
             case CONTENT_MERGED -> Set.of(CONTENT_USER_TEMPLATE_KEY, "article.content.system");
+            case REDNOTE_CONTENT -> Set.of(REDNOTE_CONTENT_SYSTEM_TEMPLATE_KEY);
+            case REDNOTE_NORMAL_IMAGE_PROMPT -> Set.of(REDNOTE_NORMAL_IMAGE_PROMPT_SYSTEM_TEMPLATE_KEY);
+            case REDNOTE_COVER_IMAGE_PROMPT -> Set.of(REDNOTE_COVER_IMAGE_PROMPT_SYSTEM_TEMPLATE_KEY);
         };
     }
 

@@ -21,7 +21,22 @@ public enum PromptFeedbackStageEnum {
     /**
      * 正文和图片融合完成。
      */
-    CONTENT_MERGED("CONTENT_MERGED", "正文融合");
+    CONTENT_MERGED("CONTENT_MERGED", "正文融合"),
+
+    /**
+     * 小红书文案生成完成后，对文案系统 Prompt 采集反馈。
+     */
+    REDNOTE_CONTENT("REDNOTE_CONTENT", "小红书文案"),
+
+    /**
+     * 小红书生成完成后，对普通配图提示词系统 Prompt 采集反馈。
+     */
+    REDNOTE_NORMAL_IMAGE_PROMPT("REDNOTE_NORMAL_IMAGE_PROMPT", "小红书普通配图"),
+
+    /**
+     * 小红书生成完成后，对封面图提示词系统 Prompt 采集反馈。
+     */
+    REDNOTE_COVER_IMAGE_PROMPT("REDNOTE_COVER_IMAGE_PROMPT", "小红书封面图");
 
     /**
      * 持久化枚举值。
@@ -67,6 +82,7 @@ public enum PromptFeedbackStageEnum {
      * 返回管理端统计需要展示的固定环节顺序。
      */
     public static List<PromptFeedbackStageEnum> orderedStages() {
-        return List.of(TITLE_SELECTION, OUTLINE_EDITING, CONTENT_MERGED);
+        return List.of(TITLE_SELECTION, OUTLINE_EDITING, CONTENT_MERGED,
+                REDNOTE_CONTENT, REDNOTE_NORMAL_IMAGE_PROMPT, REDNOTE_COVER_IMAGE_PROMPT);
     }
 }

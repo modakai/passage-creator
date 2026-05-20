@@ -29,12 +29,12 @@ public class PromptFeedback implements Serializable {
     private Long userId;
 
     /**
-     * 文章创作任务 id。
+     * 创作任务 id，兼容 article 和 rednote 任务。
      */
     private String taskId;
 
     /**
-     * 反馈环节：TITLE_SELECTION/OUTLINE_EDITING/CONTENT_MERGED。
+     * 反馈环节，覆盖文章人工节点和 rednote 终态 Prompt 节点。
      */
     private String feedbackStage;
 

@@ -10,6 +10,7 @@ import com.sakura.passage_creator.prompt.model.entity.PromptTemplate;
 import com.sakura.passage_creator.prompt.model.enums.PromptTemplateStatusEnum;
 import com.sakura.passage_creator.prompt.model.vo.PromptTemplateVO;
 import com.sakura.passage_creator.prompt.repository.PromptTemplateMapper;
+import com.sakura.passage_creator.prompt.service.PromptActiveTemplateCache;
 import com.sakura.passage_creator.prompt.service.PromptTemplateJsonSchemaNormalizer;
 import com.sakura.passage_creator.prompt.api.PromptTemplateRenderResult;
 import com.sakura.passage_creator.prompt.service.PromptTemplateRenderer;
@@ -63,10 +64,17 @@ public class PromptTemplateServiceImpl extends ServiceImpl<PromptTemplateMapper,
      */
     private final PromptTemplateJsonSchemaNormalizer schemaNormalizer;
 
+    /**
+     * ACTIVE Prompt Redis 缓存，用于跨实例快速读取当前发布版本。
+     */
+    private final PromptActiveTemplateCache redisActiveTemplateCache;
+
     public PromptTemplateServiceImpl(PromptTemplateRenderer renderer,
-            PromptTemplateJsonSchemaNormalizer schemaNormalizer) {
+            PromptTemplateJsonSchemaNormalizer schemaNormalizer,
+            PromptActiveTemplateCache redisActiveTemplateCache) {
         this.renderer = renderer;
         this.schemaNormalizer = schemaNormalizer;
+        this.redisActiveTemplateCache = redisActiveTemplateCache;
     }
 
     @Override
@@ -184,7 +192,7 @@ public class PromptTemplateServiceImpl extends ServiceImpl<PromptTemplateMapper,
     public boolean refreshTemplate(String templateKey, String environment) {
         ThrowUtils.throwIf(StringUtils.isBlank(templateKey), ErrorCode.PARAMS_ERROR, "模板标识不能为空");
         String resolvedEnvironment = resolveEnvironment(environment);
-        activeTemplateCache.remove(buildCacheKey(templateKey, resolvedEnvironment));
+        evictActiveTemplateCache(templateKey, resolvedEnvironment);
         findActiveTemplate(templateKey, resolvedEnvironment);
         return true;
     }
@@ -201,6 +209,17 @@ public class PromptTemplateServiceImpl extends ServiceImpl<PromptTemplateMapper,
         String content = renderer.render(activeTemplate.getContent(), activeTemplate.getVariablesSchema(), variables);
         return new PromptTemplateRenderResult(activeTemplate.getId(), activeTemplate.getTemplateKey(),
                 activeTemplate.getVersion(), activeTemplate.getEnvironment(), content, false);
+    }
+
+    @Override
+    public PromptTemplateRenderResult resolveActiveRaw(String templateKey, String fallbackContent) {
+        String environment = DEFAULT_ENVIRONMENT;
+        PromptTemplate activeTemplate = findActiveTemplateSafely(templateKey, environment);
+        if (activeTemplate == null) {
+            return new PromptTemplateRenderResult(null, templateKey, "fallback", environment, fallbackContent, true);
+        }
+        return new PromptTemplateRenderResult(activeTemplate.getId(), activeTemplate.getTemplateKey(),
+                activeTemplate.getVersion(), activeTemplate.getEnvironment(), activeTemplate.getContent(), false);
     }
 
     @Override
@@ -254,12 +273,20 @@ public class PromptTemplateServiceImpl extends ServiceImpl<PromptTemplateMapper,
      */
     private PromptTemplate findActiveTemplate(String templateKey, String environment) {
         return activeTemplateCache.computeIfAbsent(buildCacheKey(templateKey, environment),
-                key -> this.getOne(QueryWrapper.create()
-                        .where(PROMPT_TEMPLATE.TEMPLATE_KEY.eq(templateKey))
-                        .and(PROMPT_TEMPLATE.ENVIRONMENT.eq(environment))
-                        .and(PROMPT_TEMPLATE.STATUS.eq(PromptTemplateStatusEnum.ACTIVE.getValue()))
-                        .orderBy(PROMPT_TEMPLATE.PUBLISHED_AT, false)
-                        .orderBy(PROMPT_TEMPLATE.ID, false)));
+                key -> {
+                    PromptTemplate cachedTemplate = redisActiveTemplateCache.get(key);
+                    if (cachedTemplate != null) {
+                        return cachedTemplate;
+                    }
+                    PromptTemplate activeTemplate = this.getOne(QueryWrapper.create()
+                            .where(PROMPT_TEMPLATE.TEMPLATE_KEY.eq(templateKey))
+                            .and(PROMPT_TEMPLATE.ENVIRONMENT.eq(environment))
+                            .and(PROMPT_TEMPLATE.STATUS.eq(PromptTemplateStatusEnum.ACTIVE.getValue()))
+                            .orderBy(PROMPT_TEMPLATE.PUBLISHED_AT, false)
+                            .orderBy(PROMPT_TEMPLATE.ID, false));
+                    redisActiveTemplateCache.put(key, activeTemplate);
+                    return activeTemplate;
+                });
     }
 
     /**
@@ -317,6 +344,15 @@ public class PromptTemplateServiceImpl extends ServiceImpl<PromptTemplateMapper,
      * 构造缓存键。
      */
     private String buildCacheKey(String templateKey, String environment) {
-        return environment + "::" + templateKey;
+        return "prompt:template:active:" + environment + ":" + templateKey;
+    }
+
+    /**
+     * 同时驱逐本地缓存和 Redis 缓存，保证发布后的新任务读取最新 ACTIVE 版本。
+     */
+    private void evictActiveTemplateCache(String templateKey, String environment) {
+        String cacheKey = buildCacheKey(templateKey, environment);
+        activeTemplateCache.remove(cacheKey);
+        redisActiveTemplateCache.evict(cacheKey);
     }
 }

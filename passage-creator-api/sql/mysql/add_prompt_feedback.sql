@@ -4,8 +4,8 @@ create table if not exists prompt_feedback
     id                  bigint                                not null comment '主键 id'
         primary key,
     user_id             bigint                                not null comment '提交反馈的用户 id',
-    task_id             varchar(64)                           not null comment '文章创作任务 id',
-    feedback_stage      varchar(32)                           not null comment '反馈环节：TITLE_SELECTION/OUTLINE_EDITING/CONTENT_MERGED',
+    task_id             varchar(64)                           not null comment '创作任务 id',
+    feedback_stage      varchar(32)                           not null comment '反馈环节：文章三环节或 rednote 三个终态 Prompt 环节',
     rating              varchar(16)                           not null comment '评价结果：VERY_SATISFIED/SATISFIED/NEUTRAL/UNSATISFIED',
     remark              varchar(1000)                         null comment '用户可选填写的文字说明',
     prompt_usage_log_id bigint                                null comment '关联的 Prompt 使用日志 id',

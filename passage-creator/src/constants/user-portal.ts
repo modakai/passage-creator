@@ -2,21 +2,26 @@ import {
   BarChart3Icon,
   ChartColumnBigIcon,
   CreditCardIcon,
+  FileTextIcon,
   HomeIcon,
   ImageIcon,
   Layers3Icon,
   ListIcon,
-  PenLineIcon,
   SettingsIcon,
   ShieldCheckIcon,
   SparklesIcon,
   WandSparklesIcon,
 } from '@lucide/vue'
 
+// 创作入口单独维护，桌面端下拉菜单和移动端菜单共用同一份路由配置。
+export const creationNavItems = [
+  { label: '小红书创作', to: '/rednote-creator', icon: SparklesIcon },
+  { label: '文字创作', to: '/article-creator', icon: FileTextIcon },
+]
+
 // 用户端顶部导航配置，同时用于移动端菜单和页面高亮。
 export const userNavItems = [
   { label: '首页', to: '/', icon: HomeIcon },
-  { label: '创作', to: '/article-creator', icon: PenLineIcon },
   { label: '创作记录', to: '/my-articles', icon: ListIcon },
   { label: '积分中心', to: '/billing', icon: CreditCardIcon },
   { label: '管理', to: '/dashboard', icon: SettingsIcon, adminOnly: true },

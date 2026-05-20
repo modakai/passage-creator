@@ -94,6 +94,15 @@ public interface PromptTemplateService extends IService<PromptTemplate> {
             Map<String, ?> variables);
 
     /**
+     * 读取 ACTIVE Prompt 原文，保留占位符给 Agent 框架在运行时从 state 渲染。
+     *
+     * @param templateKey 模板标识
+     * @param fallbackContent 兜底模板内容
+     * @return 未提前替换变量的 Prompt 模板
+     */
+    PromptTemplateRenderResult resolveActiveRaw(String templateKey, String fallbackContent);
+
+    /**
      * 构建分页查询条件。
      *
      * @param request 查询请求

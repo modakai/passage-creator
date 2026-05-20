@@ -6,8 +6,13 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.internal.node.Node;
+import com.sakura.passage_creator.prompt.api.PromptTemplateRenderResult;
+import com.sakura.passage_creator.prompt.api.PromptTemplateService;
+import com.sakura.passage_creator.prompt.api.PromptUsageLogService;
 import com.sakura.passage_creator.rednote.agent.billing.RednoteBillingModelInterceptorFactory;
+import com.sakura.passage_creator.rednote.agent.billing.RednotePromptUsageModelInterceptor;
 import com.sakura.passage_creator.rednote.agent.hook.RednoteCoverImagePromptAgentHook;
+import com.sakura.passage_creator.rednote.constant.RednotePromptConstant;
 import com.sakura.passage_creator.rednote.constant.UniversalConstant;
 import com.sakura.passage_creator.rednote.model.enums.RednotePhaseEnum;
 import com.sakura.passage_creator.rednote.workflow.state.RednoteWorkflowState;
@@ -27,7 +32,7 @@ public class RednoteCoverImagePromptAgent {
     /**
      * 封面图文案和提示词系统提示词，基于用户给定模板改造成结构化 JSON 输出。
      */
-    private static final String SYSTEM_PROMPT = """
+    public static final String SYSTEM_PROMPT = """
             # Role：封面图文案提取与优化专家
             
             # Profile:
@@ -68,12 +73,34 @@ public class RednoteCoverImagePromptAgent {
             }
             """;
 
-    private final ReactAgent reactAgent;
+    private final DashScopeApi dashScopeApi;
+
+    private final RednoteCoverImagePromptAgentHook rednoteCoverImagePromptAgentHook;
+
+    private final RednoteBillingModelInterceptorFactory billingInterceptorFactory;
+
+    private final PromptTemplateService promptTemplateService;
+
+    private final PromptUsageLogService promptUsageLogService;
 
     public RednoteCoverImagePromptAgent(DashScopeApi dashScopeApi,
                                         RednoteCoverImagePromptAgentHook rednoteCoverImagePromptAgentHook,
-                                        RednoteBillingModelInterceptorFactory billingInterceptorFactory) {
+                                        RednoteBillingModelInterceptorFactory billingInterceptorFactory,
+                                        PromptTemplateService promptTemplateService,
+                                        PromptUsageLogService promptUsageLogService) {
+        this.dashScopeApi = dashScopeApi;
+        this.rednoteCoverImagePromptAgentHook = rednoteCoverImagePromptAgentHook;
+        this.billingInterceptorFactory = billingInterceptorFactory;
+        this.promptTemplateService = promptTemplateService;
+        this.promptUsageLogService = promptUsageLogService;
+    }
+
+    private ReactAgent buildAgent() {
         String model = DashScopeModel.ChatModel.QWEN3_MAX.value;
+        PromptTemplateRenderResult systemPrompt = promptTemplateService.resolveActiveRaw(
+                RednotePromptConstant.COVER_IMAGE_PROMPT_SYSTEM_KEY, SYSTEM_PROMPT);
+        PromptTemplateRenderResult userPrompt = promptTemplateService.resolveActiveRaw(
+                RednotePromptConstant.COVER_IMAGE_PROMPT_USER_KEY, RednotePromptConstant.COVER_IMAGE_PROMPT_USER_PROMPT);
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
@@ -83,24 +110,23 @@ public class RednoteCoverImagePromptAgent {
                         .topP(0.9)
                         .build())
                 .build();
-        this.reactAgent = ReactAgent.builder()
+        return ReactAgent.builder()
                 .name(UniversalConstant.REDNOTE_COVER_IMAGE_PROMPT_AGENT_NAME)
                 .description("生成小红书封面文案和封面图片提示词")
                 .model(chatModel)
-                .systemPrompt(SYSTEM_PROMPT)
-                .instruction("""
-                        请基于以下小红书内容生成封面图文案和封面图片提示词：
-                        subject: {subject}
-                        bodyContent: {bodyContent}
-                        tags: {tags}
-                        """)
+                .systemPrompt(systemPrompt.content())
+                .instruction(userPrompt.content())
                 .outputType(RednoteWorkflowState.CoverImagePromptResponse.class)
                 // 封面提示词文本调用独立计费，便于后台按 Agent 阶段追踪成本。
-                .interceptors(List.of(billingInterceptorFactory.createDashScopeTextInterceptor(
-                        UniversalConstant.REDNOTE_COVER_IMAGE_PROMPT_AGENT_NAME,
-                        RednotePhaseEnum.IMAGE_PROMPT_GENERATING.getValue(),
-                        model
-                )))
+                .interceptors(List.of(
+                        billingInterceptorFactory.createDashScopeTextInterceptor(
+                                UniversalConstant.REDNOTE_COVER_IMAGE_PROMPT_AGENT_NAME,
+                                RednotePhaseEnum.IMAGE_PROMPT_GENERATING.getValue(),
+                                model
+                        ),
+                        new RednotePromptUsageModelInterceptor(promptUsageLogService,
+                                UniversalConstant.REDNOTE_COVER_IMAGE_PROMPT_AGENT_NAME, List.of(systemPrompt, userPrompt))
+                ))
                 .hooks(rednoteCoverImagePromptAgentHook)
                 // 定义封面提示词输出名称，Hook 会读取该 key 并写入 rednote_note.cover_title 和 cover_prompt。
                 .outputKey(RednoteWorkflowState.KEY_COVER_IMAGE_PROMPT_RESPONSE)
@@ -109,10 +135,10 @@ public class RednoteCoverImagePromptAgent {
     }
 
     public String name() {
-        return reactAgent.name();
+        return UniversalConstant.REDNOTE_COVER_IMAGE_PROMPT_AGENT_NAME;
     }
 
     public Node asNode() {
-        return reactAgent.asNode(true, false);
+        return buildAgent().asNode(true, false);
     }
 }

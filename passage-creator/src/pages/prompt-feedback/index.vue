@@ -77,6 +77,18 @@ const ratingOptions = [
   },
 ] as const
 
+/**
+ * 反馈环节筛选项，覆盖文章与小红书两条创作链路。
+ */
+const stageOptions: Array<{ value: PromptFeedbackStage, label: string }> = [
+  { value: 'TITLE_SELECTION', label: '标题生成' },
+  { value: 'OUTLINE_EDITING', label: '大纲生成' },
+  { value: 'CONTENT_MERGED', label: '正文融合' },
+  { value: 'REDNOTE_CONTENT', label: '小红书文案' },
+  { value: 'REDNOTE_NORMAL_IMAGE_PROMPT', label: '小红书普通配图' },
+  { value: 'REDNOTE_COVER_IMAGE_PROMPT', label: '小红书封面图' },
+]
+
 const stageFilter = computed({
   // Reka Select 不能使用空字符串选项，使用哨兵值代表全部环节。
   get: () => query.feedbackStage === '' ? ALL_SELECT_VALUE : String(query.feedbackStage),
@@ -154,7 +166,7 @@ function handleReset() {
 </script>
 
 <template>
-  <BasicPage title="Prompt 反馈" description="查看用户对标题、大纲和正文融合 Prompt 的效果反馈。" sticky>
+  <BasicPage title="Prompt 反馈" description="查看用户对文章和小红书 Prompt 的效果反馈。" sticky>
     <template #actions>
       <UiButton variant="outline" :disabled="isFetching" @click="() => { refetchFeedback(); refetchStats() }">
         <RefreshCwIcon class="mr-1 size-4" :class="{ 'animate-spin': isFetching }" />
@@ -206,14 +218,12 @@ function handleReset() {
               <UiSelectItem :value="ALL_SELECT_VALUE">
                 全部环节
               </UiSelectItem>
-              <UiSelectItem value="TITLE_SELECTION">
-                标题生成
-              </UiSelectItem>
-              <UiSelectItem value="OUTLINE_EDITING">
-                大纲生成
-              </UiSelectItem>
-              <UiSelectItem value="CONTENT_MERGED">
-                正文融合
+              <UiSelectItem
+                v-for="option in stageOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
               </UiSelectItem>
             </UiSelectContent>
           </UiSelect>

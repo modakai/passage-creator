@@ -84,7 +84,13 @@ export interface PromptUsageLogQuery extends IPaginationRequestQuery {
 /**
  * Prompt 反馈采集环节。
  */
-export type PromptFeedbackStage = 'TITLE_SELECTION' | 'OUTLINE_EDITING' | 'CONTENT_MERGED'
+export type PromptFeedbackStage =
+  | 'TITLE_SELECTION'
+  | 'OUTLINE_EDITING'
+  | 'CONTENT_MERGED'
+  | 'REDNOTE_CONTENT'
+  | 'REDNOTE_NORMAL_IMAGE_PROMPT'
+  | 'REDNOTE_COVER_IMAGE_PROMPT'
 
 /**
  * Prompt 反馈评价结果。

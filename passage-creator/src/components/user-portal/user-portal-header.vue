@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { LogOutIcon, MenuIcon, UserIcon, WandSparklesIcon } from '@lucide/vue'
+import { ChevronDownIcon, LogOutIcon, MenuIcon, PenLineIcon, UserIcon, WandSparklesIcon } from '@lucide/vue'
 
 import { NotificationBell } from '@/components/notification-center'
 import { useAuth } from '@/composables/use-auth'
-import { userNavItems } from '@/constants/user-portal'
+import { creationNavItems, userNavItems } from '@/constants/user-portal'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +15,17 @@ const activePath = computed(() => route.path)
 // 后台相关入口只对管理员展示，普通用户不会看到不可访问的导航项。
 const visibleNavItems = computed(() =>
   userNavItems.filter(item => !item.adminOnly || hasAdminAccess.value),
+)
+
+// 首页需要固定在创作菜单前面展示，不能被下拉菜单挤到后面。
+const homeNavItem = computed(() => visibleNavItems.value.find(item => item.to === '/'))
+
+// 首页之后的普通导航保持原有配置顺序，由创作下拉菜单插入到中间。
+const trailingNavItems = computed(() => visibleNavItems.value.filter(item => item.to !== '/'))
+
+// 创作菜单任一子页面命中时，父级“创作”保持高亮，避免用户迷失在当前创作类型里。
+const isCreationActive = computed(() =>
+  creationNavItems.some(item => isNavActive(item.to)),
 )
 
 // 首页需要精确匹配，其他路由允许子页面继承父导航的高亮状态。
@@ -39,7 +50,44 @@ function isNavActive(path: string) {
 
       <nav class="mx-auto hidden h-full items-center md:flex">
         <RouterLink
-          v-for="item in visibleNavItems"
+          v-if="homeNavItem"
+          :to="homeNavItem.to"
+          class="flex h-full items-center gap-2 px-6 font-medium transition-colors"
+          :class="isNavActive(homeNavItem.to) ? 'bg-emerald-50 font-semibold text-emerald-600' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'"
+        >
+          <component :is="homeNavItem.icon" class="size-5" />
+          {{ homeNavItem.label }}
+        </RouterLink>
+
+        <div class="group relative flex h-full items-center">
+          <button
+            type="button"
+            class="flex h-full items-center gap-2 px-6 font-medium transition-colors"
+            :class="isCreationActive ? 'bg-emerald-50 font-semibold text-emerald-600' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'"
+          >
+            <PenLineIcon class="size-5" />
+            创作
+            <ChevronDownIcon class="size-4 transition-transform group-hover:rotate-180" />
+          </button>
+
+          <div class="invisible absolute left-1/2 top-full z-50 w-48 -translate-x-1/2 pt-2 opacity-0 transition-all duration-150 group-hover:visible group-hover:opacity-100">
+            <div class="rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10">
+              <RouterLink
+                v-for="item in creationNavItems"
+                :key="item.to"
+                :to="item.to"
+                class="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors"
+                :class="isNavActive(item.to) ? 'bg-emerald-50 text-emerald-600' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'"
+              >
+                <component :is="item.icon" class="size-4" />
+                {{ item.label }}
+              </RouterLink>
+            </div>
+          </div>
+        </div>
+
+        <RouterLink
+          v-for="item in trailingNavItems"
           :key="item.to"
           :to="item.to"
           class="flex h-full items-center gap-2 px-6 font-medium transition-colors"
@@ -81,8 +129,22 @@ function isNavActive(path: string) {
           </UiButton>
         </UiDropdownMenuTrigger>
         <UiDropdownMenuContent align="end" class="w-56">
+          <UiDropdownMenuItem v-if="homeNavItem" @click="router.push(homeNavItem.to)">
+            <component :is="homeNavItem.icon" class="mr-2 size-4" />
+            {{ homeNavItem.label }}
+          </UiDropdownMenuItem>
+          <UiDropdownMenuSeparator />
           <UiDropdownMenuItem
-            v-for="item in visibleNavItems"
+            v-for="item in creationNavItems"
+            :key="item.to"
+            @click="router.push(item.to)"
+          >
+            <component :is="item.icon" class="mr-2 size-4" />
+            {{ item.label }}
+          </UiDropdownMenuItem>
+          <UiDropdownMenuSeparator />
+          <UiDropdownMenuItem
+            v-for="item in trailingNavItems"
             :key="item.to"
             @click="router.push(item.to)"
           >

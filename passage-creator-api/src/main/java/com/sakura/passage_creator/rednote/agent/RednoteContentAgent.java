@@ -6,8 +6,13 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.spec.DashScopeModel;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.internal.node.Node;
+import com.sakura.passage_creator.prompt.api.PromptTemplateRenderResult;
+import com.sakura.passage_creator.prompt.api.PromptTemplateService;
+import com.sakura.passage_creator.prompt.api.PromptUsageLogService;
 import com.sakura.passage_creator.rednote.agent.billing.RednoteBillingModelInterceptorFactory;
+import com.sakura.passage_creator.rednote.agent.billing.RednotePromptUsageModelInterceptor;
 import com.sakura.passage_creator.rednote.agent.hook.RednoteContentAgentHook;
+import com.sakura.passage_creator.rednote.constant.RednotePromptConstant;
 import com.sakura.passage_creator.rednote.constant.UniversalConstant;
 import com.sakura.passage_creator.rednote.model.enums.RednotePhaseEnum;
 import com.sakura.passage_creator.rednote.workflow.state.RednoteWorkflowState;
@@ -25,9 +30,9 @@ import java.util.List;
 public class RednoteContentAgent {
 
     /**
-     * ContentAgent 的固定系统提示词；第一版不接入动态 Prompt 和积分逻辑。
+     * ContentAgent 的默认系统提示词，运行时未配置 ACTIVE 模板时作为兜底内容。
      */
-    private static final String SYSTEM_PROMPT = """
+    public static final String SYSTEM_PROMPT = """
             # Role：小红书爆款内容创作者
             
             # Profile:
@@ -71,12 +76,34 @@ public class RednoteContentAgent {
             }
             """;
 
-    private final ReactAgent reactAgent;
+    private final DashScopeApi dashScopeApi;
+
+    private final RednoteContentAgentHook rednoteContentAgentHook;
+
+    private final RednoteBillingModelInterceptorFactory billingInterceptorFactory;
+
+    private final PromptTemplateService promptTemplateService;
+
+    private final PromptUsageLogService promptUsageLogService;
 
     public RednoteContentAgent(DashScopeApi dashScopeApi,
                                RednoteContentAgentHook rednoteContentAgentHook,
-                               RednoteBillingModelInterceptorFactory billingInterceptorFactory) {
+                               RednoteBillingModelInterceptorFactory billingInterceptorFactory,
+                               PromptTemplateService promptTemplateService,
+                               PromptUsageLogService promptUsageLogService) {
+        this.dashScopeApi = dashScopeApi;
+        this.rednoteContentAgentHook = rednoteContentAgentHook;
+        this.billingInterceptorFactory = billingInterceptorFactory;
+        this.promptTemplateService = promptTemplateService;
+        this.promptUsageLogService = promptUsageLogService;
+    }
+
+    private ReactAgent buildAgent() {
         String model = DashScopeModel.ChatModel.QWEN3_MAX.value;
+        PromptTemplateRenderResult systemPrompt = promptTemplateService.resolveActiveRaw(
+                RednotePromptConstant.CONTENT_SYSTEM_KEY, SYSTEM_PROMPT);
+        PromptTemplateRenderResult userPrompt = promptTemplateService.resolveActiveRaw(
+                RednotePromptConstant.CONTENT_USER_KEY, RednotePromptConstant.CONTENT_USER_PROMPT);
         ChatModel chatModel = DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
@@ -86,28 +113,23 @@ public class RednoteContentAgent {
                         .topP(0.9)
                         .build())
                 .build();
-        this.reactAgent = ReactAgent.builder()
+        return ReactAgent.builder()
                 .name(UniversalConstant.REDNOTE_CONTENT_AGENT_NAME)
                 .description("根据 RednoteBrief 生成小红书正文和标签")
                 .model(chatModel)
-                .systemPrompt(SYSTEM_PROMPT)
-                .instruction("""
-                        请基于以下 RednoteBrief 生成小红书结构化文案：
-                        subject: {subject}
-                        context: {context}
-                        contentLength: {contentLength}
-                        targetWordCount: {targetWordCount}
-                        keywords: {keywords}
-                        tagCount: {tagCount}
-                        searchResults: {searchResults}
-                        """)
+                .systemPrompt(systemPrompt.content())
+                .instruction(userPrompt.content())
                 .outputType(RednoteWorkflowState.ContentResponse.class)
                 // 文案生成按真实 token 用量结算，失败时释放预扣积分。
-                .interceptors(List.of(billingInterceptorFactory.createDashScopeTextInterceptor(
-                        UniversalConstant.REDNOTE_CONTENT_AGENT_NAME,
-                        RednotePhaseEnum.COPY_GENERATING.getValue(),
-                        model
-                )))
+                .interceptors(List.of(
+                        billingInterceptorFactory.createDashScopeTextInterceptor(
+                                UniversalConstant.REDNOTE_CONTENT_AGENT_NAME,
+                                RednotePhaseEnum.COPY_GENERATING.getValue(),
+                                model
+                        ),
+                        new RednotePromptUsageModelInterceptor(promptUsageLogService,
+                                UniversalConstant.REDNOTE_CONTENT_AGENT_NAME, List.of(systemPrompt, userPrompt))
+                ))
                 .hooks(rednoteContentAgentHook)
                 // 定义 ContentAgent 的输出名称，Hook 会读取该 key 并写入 rednote_note。
                 .outputKey(RednoteWorkflowState.KEY_COPYWRITING)
@@ -116,10 +138,10 @@ public class RednoteContentAgent {
     }
 
     public String name() {
-        return reactAgent.name();
+        return UniversalConstant.REDNOTE_CONTENT_AGENT_NAME;
     }
 
     public Node asNode() {
-        return reactAgent.asNode(true, false);
+        return buildAgent().asNode(true, false);
     }
 }

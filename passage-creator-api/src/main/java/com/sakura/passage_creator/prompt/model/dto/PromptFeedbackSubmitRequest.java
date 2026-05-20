@@ -13,7 +13,7 @@ import java.io.Serializable;
 public class PromptFeedbackSubmitRequest implements Serializable {
 
     /**
-     * 文章创作任务 id。
+     * 创作任务 id，兼容 article 和 rednote 任务。
      */
     @NotBlank(message = "任务 id 不能为空")
     private String taskId;

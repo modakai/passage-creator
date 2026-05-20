@@ -22,7 +22,9 @@ import type {
   RednoteSearchResult,
   RednoteSseMessage,
 } from '@/services/types/app-rednote.type'
+import type { PromptFeedbackStage } from '@/services/types/prompt-template.type'
 
+import PromptFeedbackCard from '@/pages/article-creator/components/prompt-feedback-card.vue'
 import {
   createAppRednoteTask,
   downloadAppRednoteImage,
@@ -57,6 +59,12 @@ const phaseSteps: Array<{ phase: RednotePhase, title: string, desc: string }> = 
   { phase: 'IMAGE_PROMPT_GENERATING', title: '图片规划中', desc: '正在整理封面和配图需求' },
   { phase: 'IMAGE_GENERATING', title: '图片生成中', desc: '正在生成封面和配图' },
   { phase: 'COMPLETED', title: '生成完成', desc: '内容和图片已保存' },
+]
+
+const rednotePromptFeedbackStages: PromptFeedbackStage[] = [
+  'REDNOTE_CONTENT',
+  'REDNOTE_NORMAL_IMAGE_PROMPT',
+  'REDNOTE_COVER_IMAGE_PROMPT',
 ]
 
 const phaseDisplayLabels: Record<string, string> = {
@@ -948,6 +956,14 @@ onBeforeUnmount(() => {
         </div>
       </section>
     </main>
+
+    <PromptFeedbackCard
+      v-if="taskId && isCompleted"
+      :task-id="taskId"
+      :stages="rednotePromptFeedbackStages"
+      title="这次小红书生成效果如何？"
+      description="反馈会同时关联文案、普通配图和封面图 Prompt。"
+    />
   </div>
 </template>
 
