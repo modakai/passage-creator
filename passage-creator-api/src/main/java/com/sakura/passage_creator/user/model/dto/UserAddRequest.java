@@ -32,6 +32,13 @@ public class UserAddRequest implements Serializable {
     private String userAccount;
 
     /**
+     * 初始密码
+     */
+    @NotBlank(message = "{validation.user.password.not_blank}")
+    @Size(min = 8, message = "{validation.user.password.min}")
+    private String userPassword;
+
+    /**
      * 用户头像
      */
     private String userAvatar;

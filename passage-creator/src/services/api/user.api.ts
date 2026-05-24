@@ -120,9 +120,9 @@ export function useResetUserPasswordMutation() {
   const { apiFetch } = useApiFetch()
   const queryClient = useQueryClient()
 
-  return useMutation<IResponse<boolean>, Error, UserEntityId>({
+  return useMutation<IResponse<string>, Error, UserEntityId>({
     mutationKey: ['user-reset-password'],
-    mutationFn: async id => await apiFetch<IResponse<boolean>>('/user/reset/password', {
+    mutationFn: async id => await apiFetch<IResponse<string>>('/user/reset/password', {
       method: 'post',
       body: { id },
     }),

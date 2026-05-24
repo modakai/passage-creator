@@ -10,6 +10,7 @@ import com.sakura.passage_creator.shared.common.ErrorCode;
 import com.sakura.passage_creator.shared.common.ResultUtils;
 import com.sakura.passage_creator.shared.constant.UserConstant;
 import com.sakura.passage_creator.shared.exception.ThrowUtils;
+import com.sakura.passage_creator.infrastructure.auth.PasswordHashService;
 import com.sakura.passage_creator.user.api.UserDisabledEvent;
 import com.sakura.passage_creator.user.model.dto.UserAddRequest;
 import com.sakura.passage_creator.user.model.dto.UserQueryRequest;
@@ -22,7 +23,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.util.DigestUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -47,6 +47,9 @@ public class UserAdminController {
     @Resource
     private ApplicationEventPublisher applicationEventPublisher;
 
+    @Resource
+    private PasswordHashService passwordHashService;
+
     /**
      * MapStruct Plus 转换器，用于替代反射式 BeanUtils 属性复制。
      */
@@ -66,10 +69,8 @@ public class UserAdminController {
     public BaseResponse<Long> addUser(@Valid @RequestBody UserAddRequest userAddRequest, HttpServletRequest request) {
         User user = converter.convert(userAddRequest, User.class);
 
-        // 后台创建用户时，初始化默认密码。
-        String defaultPassword = UserConstant.DEFAULT_PASSWORD;
-        String encryptPassword = DigestUtils.md5DigestAsHex((UserConstant.PASSWORD_SALT + defaultPassword).getBytes());
-        user.setUserPassword(encryptPassword);
+        // 后台创建用户必须由管理员指定初始密码，不再落入固定默认密码。
+        user.setUserPassword(passwordHashService.hash(userAddRequest.getUserPassword()));
 
         boolean result = userService.save(user);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
@@ -165,10 +166,9 @@ public class UserAdminController {
     @PostMapping("/reset/password")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     @AuditLogRecord(description = "重置用户密码", module = "用户管理", operationType = AuditOperationTypeEnum.UPDATE)
-    public BaseResponse<Boolean> resetUserPassword(@Valid @RequestBody DeleteRequest deleteRequest,
+    public BaseResponse<String> resetUserPassword(@Valid @RequestBody DeleteRequest deleteRequest,
             HttpServletRequest request) {
-        boolean result = userService.resetPassword(deleteRequest.getId());
-        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-        return ResultUtils.success(true);
+        String temporaryPassword = userService.resetPassword(deleteRequest.getId());
+        return ResultUtils.success(temporaryPassword);
     }
 }

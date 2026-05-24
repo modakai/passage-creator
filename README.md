@@ -1,9 +1,21 @@
-# Sakura Admin 全栈模板
+# Sakura AI Passage Creator
 
-这是一个前后端分离的后台管理模板，根目录下包含 Vue 管理端和 Spring Boot 3 后端服务：
+Sakura AI Passage Creator 是一个前后端分离的 AI 图文创作平台，核心目标是把选题、标题、大纲、正文、配图、小红书笔记等内容生产流程串成可观测、可干预、可运营的完整系统。
 
-- `shadcn-vue-app`：前端项目，基于 shadcn-vue-admin 改造。
-- `springboot3_init`：后端项目，提供用户、权限、字典、协议、通知、审计等基础能力。
+项目当前包含两个主工程：
+
+- `passage-creator`：前端应用，基于 Vue 3、TypeScript、Vite、shadcn-vue 和 Tailwind CSS。
+- `passage-creator-api`：后端 API，基于 Spring Boot 3、Spring AI Alibaba、MyBatis-Flex、MySQL 和 Redis。
+
+## 核心能力
+
+- AI 文章创作：支持标题生成、大纲确认、正文生成、配图分析和图片生成的多阶段工作流。
+- 小红书创作：支持面向小红书场景的选题搜索、内容生成、封面图提示词和正文配图提示词生成。
+- 人机协作：标题、大纲等关键节点支持用户确认或修改后继续执行。
+- 配图能力：支持 Pexels、Mermaid、Iconify、SVG 图示、OpenAI 图片生成等策略，并通过后端统一编排。
+- 会员与额度：支持点数、模型计价、AI 用量记录和人工扫码充值流程。
+- 后台管理：包含用户、文章、提示词模板、通知、字典、协议、审计日志、在线用户、系统配置和可观测性面板。
+- 可观测性：后端提供接口监控、系统状态、登录安全事件、审计日志和 Prometheus 指标入口。
 
 ## 技术栈
 
@@ -12,7 +24,8 @@
 - Vue 3 + TypeScript + Vite
 - shadcn-vue + Reka UI + Tailwind CSS
 - Pinia + pinia-plugin-persistedstate
-- vue-router
+- vue-router + vite-plugin-vue-layouts
+- TanStack Vue Query + TanStack Vue Table
 - ofetch
 - Vitest + ESLint
 - pnpm
@@ -21,12 +34,14 @@
 
 - Java 17
 - Spring Boot 3.5.4
+- Spring AI Alibaba
+- Spring Modulith
 - MyBatis-Flex
 - MySQL 8.x
 - Redis
-- Lombok
+- Lombok + MapStruct Plus
 - Hutool
-- EasyExcel
+- Apache Fesod
 - 阿里云 OSS SDK
 - wx-java
 - Maven
@@ -35,15 +50,15 @@
 
 ```text
 .
-├── shadcn-vue-app/     # 前端管理端
-├── springboot3_init/   # Spring Boot 后端
-├── docs/               # 项目过程文档
-└── README.md           # 项目级说明
+├── passage-creator/       # Vue 前端应用
+├── passage-creator-api/   # Spring Boot 后端 API
+├── docs/                  # 项目设计、功能说明和过程文档
+├── openspec/              # OpenSpec 变更与规格文档
+├── AGENTS.md              # 仓库级协作约束
+└── README.md              # 项目说明
 ```
 
-## 本地启动
-
-### 环境要求
+## 环境要求
 
 - JDK 17+
 - Maven 3.8+
@@ -52,289 +67,115 @@
 - MySQL 8.x
 - Redis 6+
 
-## 快速脚手架启动
-
-项目现在提供两条启动路径：本地开发启动和 Docker Compose 一体化启动。首次体验模板时，优先推荐 Docker Compose；需要调试源码时，使用本地开发启动。
-
-### 默认初始化数据
-
-初始化数据脚本位于：
-
-```text
-springboot3_init/sql/init_data.sql
-```
-
-如果需要 PostgreSQL 版本，可使用：
-
-```text
-springboot3_init/sql/postgresql/create_table.sql
-springboot3_init/sql/postgresql/init_data.sql
-```
-
-默认管理员账号：
-
-```text
-账号：sakura
-密码：12345678
-```
-
-该账号是模板内置超级管理员，仅用于本地开发和首次体验。生产环境必须在部署后立即修改密码，或删除默认账号并创建新的管理员。
-
-### Docker Compose 一体化启动
-
-根目录提供了 `docker-compose.yml`，会编排以下服务：
-
-| 服务 | 容器名 | 默认宿主机端口 | 说明 |
-| --- | --- | --- | --- |
-| 前端 Nginx | `sakura-web` | `80` | 托管前端静态资源，并代理 `/api` |
-| 后端 API | `sakura-api` | `8101` | Spring Boot 服务 |
-| MySQL | `sakura-mysql` | `3306` | 首次启动自动执行建表和初始化数据 |
-| Redis | `sakura-redis` | `6379` | Token、在线用户和系统配置缓存 |
-
-启动命令：
-
-```bash
-docker compose up -d --build
-```
-
-Windows PowerShell 也可以使用封装脚本：
-
-```powershell
-./scripts/docker-up.ps1
-```
-
-启动后访问：
-
-```text
-前端：http://localhost
-后端：http://localhost:8101/api
-```
-
-如需修改端口、数据库密码或前端构建时的 API 地址，复制根目录 `.env.example` 为 `.env` 后修改：
-
-```bash
-cp .env.example .env
-```
-
-常用操作：
-
-```bash
-# 查看日志
-docker compose logs -f
-
-# 停止服务
-docker compose down
-
-# 删除容器和数据卷后重新执行首次初始化
-docker compose down -v
-docker compose up -d --build
-```
-
-注意：MySQL 官方镜像只会在数据目录为空时执行 `/docker-entrypoint-initdb.d` 下的 SQL。已有数据卷时，修改 `create_table.sql` 或 `init_data.sql` 不会自动重新导入，需要手动导入或删除 volume 后重建。
-
-### 本地开发脚本
-
-如果你已经在本机启动 MySQL 和 Redis，并完成 SQL 导入，可以使用：
-
-```powershell
-./scripts/dev.ps1
-```
-
-脚本会检查 `java`、`mvn`、`pnpm` 是否可用，并分别打开后端和前端开发服务窗口。脚本不会静默修改数据库，也不会删除已有数据。
+## 本地启动
 
 ### 1. 初始化 MySQL
 
-本地默认数据库名为 `sakura_boot_init`，后端开发环境默认使用 `root/root` 连接本机 MySQL：
+后端开发环境配置文件当前默认连接本机 MySQL：
 
-```bash
-mysql -uroot -proot < springboot3_init/sql/create_table.sql
-mysql -uroot -proot sakura_boot_init < springboot3_init/sql/init_data.sql
+```text
+数据库：sakura_passage_creator
+用户名：root
+密码：root
 ```
 
-PostgreSQL 初始化脚本在 `springboot3_init/sql/postgresql` 目录下。由于当前后端默认依赖 MySQL 驱动和 MySQL 方言，PostgreSQL 脚本主要用于结构参考或后续适配 PostgreSQL 时初始化数据库：
+初始化脚本位于：
 
-```bash
-createdb sakura_boot_init
-psql -d sakura_boot_init -f springboot3_init/sql/postgresql/create_table.sql
-psql -d sakura_boot_init -f springboot3_init/sql/postgresql/init_data.sql
+```text
+passage-creator-api/sql/mysql/create_table.sql
+passage-creator-api/sql/mysql/init_data.sql
 ```
 
-如果你的 MySQL 用户名、密码或端口不同，优先在 `springboot3_init/.env.local` 覆盖后端配置，避免直接改动公共配置文件。
+注意：当前 MySQL 初始化脚本内部创建并切换的数据库名是 `sakura_boot_init`，而 `application-dev.yml` 默认连接的是 `sakura_passage_creator`。启动前必须统一这两个值，否则后端会连到没有初始化表的库。
+
+更稳妥的做法是不要直接改公共配置，而是在 `passage-creator-api/.env.local` 中覆盖开发数据库连接：
+
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3306/sakura_boot_init
+spring.datasource.username=root
+spring.datasource.password=root
+```
+
+然后执行初始化脚本：
+
+```bash
+mysql -uroot -proot < passage-creator-api/sql/mysql/create_table.sql
+mysql -uroot -proot sakura_boot_init < passage-creator-api/sql/mysql/init_data.sql
+```
+
+如果需要 PostgreSQL 结构参考，可查看：
+
+```text
+passage-creator-api/sql/postgresql/
+```
+
+注意：当前后端默认依赖 MySQL 驱动和 MySQL 方言，PostgreSQL 脚本主要用于后续适配参考。
 
 ### 2. 启动 Redis
 
-后端开发环境默认连接：
+开发环境默认 Redis 配置：
 
-- Host：`localhost`
-- Port：`6379`
-- Database：`1`
-- Password：空
-
-本机已有 Redis 时直接启动即可；使用 Docker 可参考：
-
-```bash
-docker run --name sakura-redis -p 6379:6379 -d redis:7
+```text
+Host：localhost
+Port：6379
+Database：1
+Password：空
 ```
 
-### 3. 启动后端
+本机没有 Redis 时，可临时使用 Docker 启动：
 
 ```bash
-cd springboot3_init
+docker run --name sakura-passage-redis -p 6379:6379 -d redis:7
+```
+
+### 3. 配置后端密钥
+
+后端会读取 `passage-creator-api` 目录下的环境文件：
+
+```text
+.env
+.env.${spring.profiles.active}
+.env.local
+```
+
+开发环境可在 `passage-creator-api/.env.local` 或 `passage-creator-api/.env.dev` 中配置敏感信息：
+
+```properties
+DASH_SCOPE_KEY=
+OPENAI_API_KEY=
+OPENAI_BASE_URL=
+PEXELS_API_KEY=
+TAVILY_API_KEY=
+OSS_ACCESS_KEY=
+OSS_SECRET_KEY=
+```
+
+缺少部分第三方密钥时，相关能力会不可用或进入降级逻辑；但数据库、Redis、登录和后台基础功能仍应优先保证可运行。
+
+### 4. 启动后端
+
+```bash
+cd passage-creator-api
 mvn spring-boot:run
 ```
 
-后端默认地址：
+默认地址：
 
-- 服务根地址：`http://localhost:8101`
-- 接口上下文：`/api`
-- 完整接口前缀：`http://localhost:8101/api`
+```text
+服务根地址：http://localhost:8101
+接口上下文：/api
+完整接口前缀：http://localhost:8101/api
+```
 
-### 4. 启动前端
+### 5. 启动前端
 
 ```bash
-cd shadcn-vue-app
+cd passage-creator
 pnpm install
 pnpm dev
 ```
 
-前端开发环境默认通过 `shadcn-vue-app/.env.development` 请求：
-
-```text
-VITE_SERVER_API_URL=http://localhost:8101
-VITE_SERVER_API_PREFIX=/api
-```
-
-## 环境变量说明
-
-### 前端环境变量
-
-前端环境变量位于 `shadcn-vue-app/.env.*`。
-
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `VITE_SERVER_API_URL` | 开发环境为 `http://localhost:8101` | 后端服务根地址，不要以 `/` 结尾 |
-| `VITE_SERVER_API_PREFIX` | `/api` | 后端接口统一前缀，不要以 `/` 结尾 |
-| `VITE_SERVER_API_TIMEOUT` | 开发环境为 `5000` | 接口超时时间，单位毫秒 |
-| `VITE_AUTH_TOKEN_HEADER_NAME` | `Authorization` | 主 Token 请求头名称 |
-| `VITE_AUTH_TOKEN_HEADER_PREFIX` | `Bearer ` | 主 Token 请求头前缀 |
-| `VITE_AUTH_COMPATIBILITY_TOKEN_HEADER_ENABLED` | `true` | 是否同时发送兼容旧接口的 Token 请求头 |
-| `VITE_AUTH_COMPATIBILITY_TOKEN_HEADER_NAME` | `token` | 兼容旧接口的 Token 请求头名称 |
-| `VITE_APP_TITLE` | `Sakura Admin` | 前端应用标题 |
-
-前端真实请求地址由以下规则拼接：
-
-```text
-API_BASE_URL = VITE_SERVER_API_URL + VITE_SERVER_API_PREFIX
-```
-
-例如开发环境为 `http://localhost:8101/api`。
-
-### 后端环境变量
-
-后端主配置位于：
-
-- `springboot3_init/src/main/resources/application.yml`
-- `springboot3_init/src/main/resources/application-dev.yml`
-- `springboot3_init/src/main/resources/application-prod.yml`
-- `springboot3_init/src/main/resources/application-test.yml`
-
-`application.yml` 会额外导入后端项目根目录下的环境文件：
-
-- `.env`
-- `.env.${spring.profiles.active}`
-- `.env.local`
-
-常用覆盖项示例：
-
-```properties
-# MySQL 连接
-spring.datasource.url=jdbc:mysql://localhost:3306/sakura_boot_init
-spring.datasource.username=root
-spring.datasource.password=root
-
-# Redis 连接
-spring.data.redis.host=localhost
-spring.data.redis.port=6379
-spring.data.redis.database=1
-spring.data.redis.password=
-
-# Token 配置
-token.header-name=Authorization
-token.header-prefix=Bearer 
-token.expire-duration-seconds=2592000
-
-# OSS 配置
-oss.accessKey=
-oss.secretKey=
-oss.bucketName=sakura-init
-```
-
-微信与 OSS 也支持通过环境变量注入：
-
-| 变量 | 说明 |
-| --- | --- |
-| `WX_MP_TOKEN` | 微信公众平台 Token |
-| `WX_MP_AES_KEY` | 微信公众平台 AES Key |
-| `WX_MP_APP_ID` | 微信公众平台 AppId |
-| `WX_MP_SECRET` | 微信公众平台 Secret |
-| `WX_OPEN_APP_ID` | 微信开放平台 AppId |
-| `WX_OPEN_APP_SECRET` | 微信开放平台 AppSecret |
-| `OSS_ACCESS_KEY` | OSS AccessKey |
-| `OSS_SECRET_KEY` | OSS SecretKey |
-
-## MySQL / Redis 初始化
-
-### MySQL
-
-初始化脚本：
-
-```text
-springboot3_init/sql/create_table.sql
-```
-
-脚本会创建数据库 `sakura_boot_init` 并创建业务表。当前脚本只包含建库建表，不包含默认用户数据。
-
-### Redis
-
-Redis 用于保存登录 Token 与登录用户缓存，默认 key 前缀：
-
-- Token：`login:token:`
-- 用户：`login:user:`
-
-开发时如果遇到登录状态异常，可以清理 Redis 的 database `1` 后重新登录。
-
-## 默认账号
-
-当前仓库提供了初始化数据脚本，导入 `springboot3_init/sql/init_data.sql` 后可使用默认管理员登录。
-
-默认账号：
-
-```text
-sakura / 12345678
-```
-
-其他可用方式：
-
-1. 前端访问注册页创建普通用户。
-2. 如需管理员账号，在数据库中将目标用户的 `user_role` 改为 `admin`。
-3. 后台新增用户或重置密码时，后端默认密码常量为 `12345678`。
-
-示例 SQL：
-
-```sql
-update user set user_role = 'admin' where user_account = '你的账号';
-```
-
-## 前后端接口地址配置
-
-后端默认：
-
-```text
-server.port=8101
-server.servlet.context-path=/api
-```
-
-前端默认：
+前端开发环境默认读取 `passage-creator/.env.development`：
 
 ```text
 VITE_SERVER_API_URL=http://localhost:8101
@@ -347,94 +188,155 @@ VITE_SERVER_API_PREFIX=/api
 http://localhost:8101/api/user/login
 ```
 
-如果后端端口变更为 `8080`，只需要修改前端对应环境文件：
+## 默认账号
+
+默认账号由初始化数据脚本提供，当前 MySQL 脚本内置账号如下：
 
 ```text
-VITE_SERVER_API_URL=http://localhost:8080
+账号：sakura
+密码：sakura123
 ```
 
-如果后端去掉 `/api` 上下文，则同步修改：
+该账号是本地初始化用的超级管理员，生产环境必须立即修改密码或删除后重新创建管理员。
 
-```text
-VITE_SERVER_API_PREFIX=
+如果初始化后没有可用管理员账号，可以先注册普通用户，再在数据库中把目标用户设置为管理员：
+
+```sql
+update user set user_role = 'admin' where user_account = '你的账号';
 ```
 
-## 打包部署
+## 常用命令
 
-### 后端打包
+### 前端
 
 ```bash
-cd springboot3_init
+cd passage-creator
+
+pnpm dev        # 启动开发服务
+pnpm build      # 类型检查并构建生产包
+pnpm preview    # 预览生产构建
+pnpm lint       # ESLint 检查
+pnpm lint:fix   # 自动修复 lint 问题
+pnpm test       # 运行 Vitest
+```
+
+### 后端
+
+```bash
+cd passage-creator-api
+
+mvn spring-boot:run        # 启动开发服务
+mvn test                   # 运行测试
+mvn clean package          # 打包
 mvn clean package -DskipTests
-java -jar target/springboot3_init-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
 ```
 
-生产配置默认连接容器服务名：
-
-- MySQL：`mysql:3306/my_db`
-- Redis：`redis:6379`
-
-实际部署时建议通过环境变量或 `.env.local` 覆盖数据库、Redis、OSS、微信等敏感配置。
-
-### 后端 Docker 镜像
-
-后端提供了 `springboot3_init/Dockerfile`，采用 Maven 多阶段构建，不需要本机提前生成 jar。
+打包后运行：
 
 ```bash
-cd springboot3_init
-docker build -t sakura-admin-api:latest .
-docker run --name sakura-admin-api -p 8101:8101 --env SPRING_PROFILES_ACTIVE=prod -d sakura-admin-api:latest
+java -jar target/passage-creator-api-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
 ```
 
-### 前端打包
+## 环境变量说明
 
-```bash
-cd shadcn-vue-app
-pnpm install
-pnpm build
-```
+### 前端环境变量
 
-构建产物位于：
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `VITE_SERVER_API_URL` | `http://localhost:8101` | 后端服务根地址，不要以 `/` 结尾 |
+| `VITE_SERVER_API_PREFIX` | `/api` | 后端接口统一前缀，可为空 |
+| `VITE_SERVER_API_TIMEOUT` | `5000` | 接口超时时间，单位毫秒 |
+| `VITE_AUTH_TOKEN_HEADER_NAME` | `Authorization` | 主 Token 请求头名称 |
+| `VITE_AUTH_TOKEN_HEADER_PREFIX` | `Bearer ` | 主 Token 请求头前缀 |
+| `VITE_AUTH_COMPATIBILITY_TOKEN_HEADER_ENABLED` | `true` | 是否同时发送兼容旧接口的 Token 请求头 |
+| `VITE_AUTH_COMPATIBILITY_TOKEN_HEADER_NAME` | `token` | 兼容旧 Token 请求头名称 |
+| `VITE_APP_TITLE` | `Sakura Admin` | 前端应用标题 |
+
+### 后端关键环境变量
+
+| 变量 | 说明 |
+| --- | --- |
+| `DASH_SCOPE_KEY` | DashScope / Spring AI Alibaba 模型调用密钥 |
+| `OPENAI_API_KEY` | OpenAI 图片生成 API Key |
+| `OPENAI_BASE_URL` | OpenAI 兼容接口地址，默认 `https://api.openai.com/v1` |
+| `OPENAI_IMAGE_OUTPUT_FORMAT` | 图片输出格式，默认 `png` |
+| `OPENAI_IMAGE_MAX_SECTION_IMAGES` | 单篇文章章节图片数量上限 |
+| `PEXELS_API_KEY` | Pexels 图库检索 API Key |
+| `TAVILY_API_KEY` | 小红书搜索 Agent 使用的 Tavily API Key |
+| `OSS_ACCESS_KEY` | 阿里云 OSS AccessKey |
+| `OSS_SECRET_KEY` | 阿里云 OSS SecretKey |
+| `WX_MP_TOKEN` | 微信公众平台 Token |
+| `WX_MP_AES_KEY` | 微信公众平台 AES Key |
+| `WX_MP_APP_ID` | 微信公众平台 AppId |
+| `WX_MP_SECRET` | 微信公众平台 Secret |
+| `WX_OPEN_APP_ID` | 微信开放平台 AppId |
+| `WX_OPEN_APP_SECRET` | 微信开放平台 AppSecret |
+
+数据库、Redis、Token、OSS、可观测性等完整默认值在以下文件中维护：
 
 ```text
-shadcn-vue-app/dist
+passage-creator-api/src/main/resources/application.yml
+passage-creator-api/src/main/resources/application-dev.yml
+passage-creator-api/src/main/resources/application-prod.yml
+passage-creator-api/src/main/resources/application-test.yml
 ```
 
-部署到 Nginx 时，将 `dist` 作为静态站点目录，并确保 `VITE_SERVER_API_URL` 指向生产后端地址。
+## Docker
 
-### 前端预览
+当前仓库提供了前端和后端各自的 Dockerfile：
+
+```text
+passage-creator/Dockerfile
+passage-creator-api/Dockerfile
+```
+
+后端镜像构建示例：
 
 ```bash
-cd shadcn-vue-app
-pnpm preview
+cd passage-creator-api
+docker build -t sakura-passage-api:latest .
+docker run --name sakura-passage-api -p 8101:8101 --env SPRING_PROFILES_ACTIVE=prod -d sakura-passage-api:latest
 ```
+
+前端镜像构建示例：
+
+```bash
+cd passage-creator
+docker build -t sakura-passage-web:latest .
+docker run --name sakura-passage-web -p 80:80 -d sakura-passage-web:latest
+```
+
+根目录当前没有 `docker-compose.yml`。如果要一键编排 MySQL、Redis、后端和前端，需要补充 Compose 文件后再按统一部署链路启动。
 
 ## 常见问题
 
 ### 前端请求 404
 
-检查前端 `VITE_SERVER_API_URL` 和 `VITE_SERVER_API_PREFIX` 是否与后端 `server.port`、`server.servlet.context-path` 一致。默认完整接口前缀应为 `http://localhost:8101/api`。
+检查 `VITE_SERVER_API_URL`、`VITE_SERVER_API_PREFIX` 是否与后端 `server.port`、`server.servlet.context-path` 一致。默认完整接口前缀应为 `http://localhost:8101/api`。
 
-### 前端请求跨域失败
+### 前端跨域失败
 
-确认后端已启动，且前端请求地址指向后端真实地址。若部署到不同域名，需要在后端配置 CORS，或通过 Nginx 将 `/api` 反向代理到后端。
+确认后端已启动，且前端请求地址指向真实后端地址。生产部署时建议通过 Nginx 把 `/api` 反向代理到后端，减少跨域配置复杂度。
 
 ### 登录失败或登录后立刻失效
 
-检查 Redis 是否启动、连接配置是否正确，并确认前后端 Token 请求头配置一致。默认主请求头为 `Authorization: Bearer <token>`，同时兼容旧请求头 `token`。
+优先检查 Redis 是否启动、连接配置是否正确，并确认前后端 Token 请求头一致。默认主请求头为 `Authorization: Bearer <token>`，同时兼容旧请求头 `token`。
 
 ### 数据库连接失败
 
-确认 MySQL 已启动、库名为 `sakura_boot_init`，并检查 `spring.datasource.url`、`spring.datasource.username`、`spring.datasource.password`。
+确认 MySQL 已启动，并检查 `spring.datasource.url`、`spring.datasource.username`、`spring.datasource.password`。尤其要确认后端连接的数据库名与 SQL 初始化脚本创建的数据库名一致。
 
-### 没有管理员账号
+### AI 生成功能不可用
 
-当前初始化脚本没有内置管理员。先注册一个普通账号，再把该账号的 `user_role` 更新为 `admin`。
+检查对应模型或工具密钥是否配置。例如文章和小红书 Agent 依赖 `DASH_SCOPE_KEY`，OpenAI 图片生成依赖 `OPENAI_API_KEY`，Pexels 图库检索依赖 `PEXELS_API_KEY`，Tavily 搜索依赖 `TAVILY_API_KEY`。
 
-### Docker 构建依赖下载慢
+### pnpm install 后 Git hooks 安装失败
 
-后端 Dockerfile 会在构建阶段下载 Maven 依赖，前端 Dockerfile 会下载 pnpm 依赖。首次构建耗时较长是正常现象，后续构建会复用 Docker 缓存。
+前端 `postinstall` 会执行 `simple-git-hooks`。如果当前环境不是标准 Git 工作区或没有写 hook 权限，可以确认 Git 仓库状态后重新执行 `pnpm install`。
 
-### pnpm install 后自动安装 Git hooks 失败
+## 相关文档
 
-前端 `postinstall` 会执行 `simple-git-hooks`。如果当前环境不是标准 Git 工作区或没有写 hook 权限，可以先确认 Git 仓库状态，再重新执行 `pnpm install`。
+- `docs/project.md`：项目介绍和功能规划。
+- `docs/article/`：文章创作主流程设计。
+- `docs/feature-*.md`：功能模块设计说明。
+- `openspec/specs/`：已归档或当前维护的规格说明。

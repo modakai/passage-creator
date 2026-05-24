@@ -69,10 +69,10 @@ public interface UserService extends IService<User> {
     boolean updateMyPassword(User loginUser, String oldPassword, String newPassword, String checkPassword);
 
     /**
-     * 将指定用户密码重置为系统默认密码。
+     * 将指定用户密码重置为随机临时密码，并清理已有登录态。
      *
      * @param id 用户 id
-     * @return 是否重置成功
+     * @return 随机临时密码
      */
-    boolean resetPassword(Long id);
+    String resetPassword(Long id);
 }

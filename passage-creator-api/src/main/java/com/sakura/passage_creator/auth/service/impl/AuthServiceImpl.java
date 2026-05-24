@@ -6,6 +6,7 @@ import com.sakura.passage_creator.audit.api.LoginAuditCommand;
 import com.sakura.passage_creator.auth.model.vo.LoginUserVO;
 import com.sakura.passage_creator.auth.service.AuthService;
 import com.sakura.passage_creator.auth.service.OnlineUserService;
+import com.sakura.passage_creator.infrastructure.auth.PasswordHashService;
 import com.sakura.passage_creator.infrastructure.auth.TokenManager;
 import com.sakura.passage_creator.shared.common.ErrorCode;
 import com.sakura.passage_creator.shared.constant.UserConstant;
@@ -23,7 +24,6 @@ import me.chanjar.weixin.common.bean.WxOAuth2UserInfo;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.util.DigestUtils;
 
 import static com.sakura.passage_creator.user.model.entity.table.UserTableDef.USER;
 
@@ -57,20 +57,26 @@ public class AuthServiceImpl implements AuthService {
     private final OnlineUserService onlineUserService;
 
     /**
+     * 密码哈希服务。
+     */
+    private final PasswordHashService passwordHashService;
+
+    /**
      * MapStruct Plus 转换器，用于替代反射式 BeanUtils 属性复制。
      */
     private final Converter converter;
 
     public AuthServiceImpl(UserMapper userMapper, TokenManager tokenManager, Converter converter) {
-        this(userMapper, tokenManager, converter, null, null);
+        this(userMapper, tokenManager, converter, new PasswordHashService(), null, null);
     }
 
     @Autowired
-    public AuthServiceImpl(UserMapper userMapper, TokenManager tokenManager, Converter converter, AuditApi auditApi,
-            OnlineUserService onlineUserService) {
+    public AuthServiceImpl(UserMapper userMapper, TokenManager tokenManager, Converter converter,
+            PasswordHashService passwordHashService, AuditApi auditApi, OnlineUserService onlineUserService) {
         this.userMapper = userMapper;
         this.tokenManager = tokenManager;
         this.converter = converter;
+        this.passwordHashService = passwordHashService;
         this.auditApi = auditApi;
         this.onlineUserService = onlineUserService;
     }
@@ -99,7 +105,7 @@ public class AuthServiceImpl implements AuthService {
 
             User user = new User();
             user.setUserAccount(userAccount);
-            user.setUserPassword(encryptPassword(userPassword));
+            user.setUserPassword(passwordHashService.hash(userPassword));
             // 注册接口只允许创建普通用户（user），角色不允许由客户端或其他参数决定。
             user.setUserRole(UserRoleEnum.USER.getValue());
             user.setStatus(UserConstant.STATUS_ENABLED);
@@ -126,11 +132,9 @@ public class AuthServiceImpl implements AuthService {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "auth.password.invalid");
             }
 
-            QueryWrapper queryWrapper = QueryWrapper.create()
-                    .where(USER.USER_ACCOUNT.eq(userAccount))
-                    .and(USER.USER_PASSWORD.eq(encryptPassword(userPassword)));
+            QueryWrapper queryWrapper = QueryWrapper.create().where(USER.USER_ACCOUNT.eq(userAccount));
             User user = userMapper.selectOneByQuery(queryWrapper);
-            if (user == null) {
+            if (user == null || !passwordHashService.matches(userPassword, user.getUserPassword())) {
                 log.info("user login failed, userAccount cannot match userPassword");
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "auth.login.invalid");
             }
@@ -246,16 +250,6 @@ public class AuthServiceImpl implements AuthService {
         loginUserVO.setCreateTime(user.getCreateTime());
         loginUserVO.setUpdateTime(user.getUpdateTime());
         return loginUserVO;
-    }
-
-    /**
-     * 加密用户密码。
-     *
-     * @param userPassword 明文密码
-     * @return 密文密码
-     */
-    private String encryptPassword(String userPassword) {
-        return DigestUtils.md5DigestAsHex((UserConstant.PASSWORD_SALT + userPassword).getBytes());
     }
 
     /**

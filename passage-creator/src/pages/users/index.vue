@@ -151,8 +151,8 @@ async function handleResetPassword() {
     return
   }
   try {
-    await resetPassword(resettingUser.value.id)
-    toast.success(t('pages.users.resetPasswordSuccess'))
+    const response = await resetPassword(resettingUser.value.id)
+    toast.success(t('pages.users.resetPasswordSuccess', { password: response.data }))
     resettingUser.value = null
   }
   catch (error: any) {

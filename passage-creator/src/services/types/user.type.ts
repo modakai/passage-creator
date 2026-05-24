@@ -35,6 +35,8 @@ export interface UserQuery extends IPaginationRequestQuery {
  */
 export interface UserAddForm {
   userAccount: string
+  /** 管理员为新用户指定的初始密码。 */
+  userPassword: string
   userName?: string
   userAvatar?: string
   userProfile?: string

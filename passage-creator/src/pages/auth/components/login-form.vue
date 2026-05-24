@@ -35,8 +35,8 @@ const errorMessage = ref('')
 const showPassword = ref(false)
 const shakeForm = ref(false)
 
-// 登录页默认填充的体验密码，与初始化数据脚本中的默认密码保持一致。
-const DEFAULT_LOGIN_PASSWORD = '12345678'
+// 登录页默认填充的体验密码，与初始化数据脚本中的默认管理员密码保持一致。
+const DEFAULT_LOGIN_PASSWORD = 'sakura123'
 
 // 紧凑版用于居中卡片登录页，保留门户版给后台入口继续使用。
 const isCompact = computed(() => props.variant === 'compact')

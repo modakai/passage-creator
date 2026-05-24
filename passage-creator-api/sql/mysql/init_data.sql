@@ -3,7 +3,7 @@
 
 use sakura_boot_init;
 
--- 默认超级管理员。账号：sakura，密码：12345678；密码算法与 UserConstant.PASSWORD_SALT 保持一致。
+-- 默认超级管理员。账号：sakura，密码：sakura123；密码使用 BCrypt 哈希。
 insert into user (
     id,
     user_account,
@@ -16,7 +16,7 @@ insert into user (
 ) values (
     1,
     'sakura',
-    '2a6dd3323691b39e8e9b1132b035ede5',
+    '$2a$10$mm6xH4Opasx37Tm4eKWiVuVZz0LQXN2c4A2L2Nmle6zSP5EYCZWWu',
     'Sakura Admin',
     'PROTECTED_SUPER_ADMIN_ACCOUNT：模板内置超级管理员，仅用于本地初始化。',
     'admin',

@@ -34,6 +34,7 @@ const isEdit = computed(() => !!props.userId)
 const form = reactive<UserAddForm & Partial<UserUpdateForm> & { id?: UserEntityId }>({
   id: undefined,
   userAccount: '',
+  userPassword: '',
   userName: '',
   userAvatar: '',
   userProfile: '',
@@ -97,6 +98,7 @@ watch(detailData, (value) => {
 function fillForm(user: any) {
   form.id = user.id
   form.userAccount = user.userAccount ?? ''
+  form.userPassword = ''
   form.userName = user.userName ?? ''
   form.userAvatar = user.userAvatar ?? ''
   form.userProfile = user.userProfile ?? ''
@@ -110,6 +112,7 @@ function fillForm(user: any) {
 function resetForm() {
   form.id = undefined
   form.userAccount = ''
+  form.userPassword = ''
   form.userName = ''
   form.userAvatar = ''
   form.userProfile = ''
@@ -123,6 +126,10 @@ function resetForm() {
 async function handleSubmit() {
   if (!isEdit.value && !form.userAccount.trim()) {
     toast.error(t('pages.users.form.accountRequired'))
+    return
+  }
+  if (!isEdit.value && form.userPassword.length < 8) {
+    toast.error(t('pages.users.form.passwordRequired'))
     return
   }
   if (!form.userRole?.trim()) {
@@ -146,6 +153,7 @@ async function handleSubmit() {
     else {
       const payload: UserAddForm = {
         userAccount: form.userAccount.trim(),
+        userPassword: form.userPassword,
         userName: form.userName?.trim() || undefined,
         userAvatar: form.userAvatar?.trim() || undefined,
         userProfile: form.userProfile?.trim() || undefined,
@@ -204,6 +212,16 @@ async function handleSubmit() {
         <div class="space-y-2">
           <UiLabel>{{ t('pages.users.columns.userName') }}</UiLabel>
           <UiInput v-model="form.userName" :placeholder="t('pages.users.form.namePlaceholder')" />
+        </div>
+
+        <div v-if="!isEdit" class="space-y-2">
+          <UiLabel>{{ t('common.password') }}</UiLabel>
+          <UiInput
+            v-model="form.userPassword"
+            type="password"
+            autocomplete="new-password"
+            :placeholder="t('pages.users.form.passwordPlaceholder')"
+          />
         </div>
 
         <div class="space-y-2">

@@ -30,16 +30,6 @@ public interface UserConstant {
     String BAN_ROLE = "ban";
 
     /**
-     * 用户密码加密盐值
-     */
-    String PASSWORD_SALT = "sakura";
-
-    /**
-     * 后台创建和重置密码时使用的默认密码。
-     */
-    String DEFAULT_PASSWORD = "12345678";
-
-    /**
      * 用户启用状态。
      */
     Integer STATUS_ENABLED = 1;

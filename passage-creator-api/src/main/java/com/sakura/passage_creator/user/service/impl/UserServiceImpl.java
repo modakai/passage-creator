@@ -4,7 +4,10 @@ import cn.hutool.core.collection.CollUtil;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
+import com.sakura.passage_creator.auth.service.OnlineUserService;
 import com.sakura.passage_creator.infrastructure.auth.LoginUserCache;
+import com.sakura.passage_creator.infrastructure.auth.PasswordHashService;
+import com.sakura.passage_creator.infrastructure.auth.TokenManager;
 import com.sakura.passage_creator.shared.common.ErrorCode;
 import com.sakura.passage_creator.shared.constant.CommonConstant;
 import com.sakura.passage_creator.shared.constant.UserConstant;
@@ -20,11 +23,10 @@ import io.github.linpeilie.Converter;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import org.springframework.util.DigestUtils;
 
 import static com.sakura.passage_creator.user.model.entity.table.UserTableDef.USER;
 
@@ -38,17 +40,47 @@ import static com.sakura.passage_creator.user.model.entity.table.UserTableDef.US
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     /**
+     * 临时密码字符集，避免容易混淆的字符。
+     */
+    private static final char[] TEMPORARY_PASSWORD_CHARS =
+            "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%-+=".toCharArray();
+
+    /**
+     * 安全随机数生成器，用于生成管理员重置后的临时密码。
+     */
+    private static final SecureRandom RANDOM = new SecureRandom();
+
+    /**
      * 登录用户快照缓存。
      */
     private final LoginUserCache loginUserCache;
+
+    /**
+     * Token 管理器。
+     */
+    private final TokenManager tokenManager;
+
+    /**
+     * 在线用户服务。
+     */
+    private final OnlineUserService onlineUserService;
+
+    /**
+     * 密码哈希服务。
+     */
+    private final PasswordHashService passwordHashService;
 
     /**
      * MapStruct Plus 转换器，用于替代反射式 BeanUtils 属性复制。
      */
     private final Converter converter;
 
-    public UserServiceImpl(LoginUserCache loginUserCache, Converter converter) {
+    public UserServiceImpl(LoginUserCache loginUserCache, TokenManager tokenManager, OnlineUserService onlineUserService,
+            PasswordHashService passwordHashService, Converter converter) {
         this.loginUserCache = loginUserCache;
+        this.tokenManager = tokenManager;
+        this.onlineUserService = onlineUserService;
+        this.passwordHashService = passwordHashService;
         this.converter = converter;
     }
 
@@ -165,30 +197,62 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         ThrowUtils.throwIf(oldPassword.equals(newPassword), ErrorCode.PARAMS_ERROR, "auth.password.same");
         ThrowUtils.throwIf(!newPassword.equals(checkPassword), ErrorCode.PARAMS_ERROR, "auth.password.not_match");
 
-        String encryptedOldPassword = DigestUtils
-                .md5DigestAsHex((UserConstant.PASSWORD_SALT + oldPassword).getBytes());
-        ThrowUtils.throwIf(!encryptedOldPassword.equals(loginUser.getUserPassword()), ErrorCode.PARAMS_ERROR,
+        ThrowUtils.throwIf(!passwordHashService.matches(oldPassword, loginUser.getUserPassword()), ErrorCode.PARAMS_ERROR,
                 "auth.password.old.invalid");
 
         User user = new User();
         user.setId(loginUser.getId());
-        user.setUserPassword(DigestUtils.md5DigestAsHex((UserConstant.PASSWORD_SALT + newPassword).getBytes()));
-        return this.updateById(user);
+        user.setUserPassword(passwordHashService.hash(newPassword));
+        boolean result = this.updateById(user);
+        if (result) {
+            removeLoginState(loginUser.getId());
+        }
+        return result;
     }
 
     @Override
-    public boolean resetPassword(Long id) {
+    public String resetPassword(Long id) {
         if (id == null || id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户 id 非法");
         }
         User oldUser = this.getById(id);
         ThrowUtils.throwIf(oldUser == null, ErrorCode.NOT_FOUND_ERROR);
 
+        String temporaryPassword = generateTemporaryPassword();
         User user = new User();
         user.setId(id);
-        // 管理员重置密码时统一恢复到系统默认密码。
-        user.setUserPassword(DigestUtils.md5DigestAsHex(
-                (UserConstant.PASSWORD_SALT + UserConstant.DEFAULT_PASSWORD).getBytes()));
-        return this.updateById(user);
+        // 管理员重置只生成一次性展示的随机临时密码，避免账户进入固定可预测密码状态。
+        user.setUserPassword(passwordHashService.hash(temporaryPassword));
+        boolean result = this.updateById(user);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        removeLoginState(id);
+        return temporaryPassword;
+    }
+
+    /**
+     * 删除指定用户的登录态和登录用户快照。
+     *
+     * @param userId 用户 id
+     */
+    private void removeLoginState(Long userId) {
+        String token = tokenManager.getTokenByUserId(userId);
+        if (StringUtils.isNotBlank(token)) {
+            onlineUserService.removeByToken(token);
+            tokenManager.removeToken(token);
+        }
+        loginUserCache.evict(userId);
+    }
+
+    /**
+     * 生成管理员重置后的随机临时密码。
+     *
+     * @return 随机临时密码
+     */
+    private String generateTemporaryPassword() {
+        char[] passwordChars = new char[20];
+        for (int i = 0; i < passwordChars.length; i++) {
+            passwordChars[i] = TEMPORARY_PASSWORD_CHARS[RANDOM.nextInt(TEMPORARY_PASSWORD_CHARS.length)];
+        }
+        return new String(passwordChars);
     }
 }
