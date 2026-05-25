@@ -7,6 +7,7 @@ import com.sakura.passage_creator.billing.model.dto.RecordAiUsageCommand;
 import com.sakura.passage_creator.billing.model.entity.AiModelPricing;
 import com.sakura.passage_creator.billing.model.entity.CreditTransaction;
 import com.sakura.passage_creator.billing.model.enums.AiRequestTypeEnum;
+import com.sakura.passage_creator.billing.service.AiCostMetricsRecorder;
 import com.sakura.passage_creator.billing.service.AiModelPricingService;
 import com.sakura.passage_creator.billing.service.AiTokenCostCalculator;
 import com.sakura.passage_creator.billing.service.AiUsageRecordService;
@@ -31,30 +32,33 @@ public class AiBillingServiceImpl implements AiBillingService {
 
     private final AiUsageRecordService usageRecordService;
 
+    private final AiCostMetricsRecorder costMetricsRecorder;
+
     private final AiTokenCostCalculator amountNormalizer = new AiTokenCostCalculator();
 
     public AiBillingServiceImpl(AiModelPricingService pricingService, CreditAccountService creditAccountService,
-            AiUsageRecordService usageRecordService) {
+                                AiUsageRecordService usageRecordService, AiCostMetricsRecorder costMetricsRecorder) {
         this.pricingService = pricingService;
         this.creditAccountService = creditAccountService;
         this.usageRecordService = usageRecordService;
+        this.costMetricsRecorder = costMetricsRecorder;
     }
 
     @Override
     public AiBillingReservation reserveTextCall(Long userId, String taskId, String agentName, String phase,
-            String provider, String model) {
+                                                String provider, String model) {
         return reserve(userId, taskId, agentName, phase, provider, model, AiRequestTypeEnum.TEXT.getValue());
     }
 
     @Override
     public AiBillingReservation reserveImageCall(Long userId, String taskId, String agentName, String phase,
-            String provider, String model) {
+                                                 String provider, String model) {
         return reserve(userId, taskId, agentName, phase, provider, model, AiRequestTypeEnum.IMAGE.getValue());
     }
 
     @Override
     public void completeTextCall(AiBillingReservation reservation, AiTokenUsageSnapshot usage, Integer latencyMs,
-            boolean responseOk, String errorMessage) {
+                                 boolean responseOk, String errorMessage) {
         if (reservation == null) {
             return;
         }
@@ -69,7 +73,7 @@ public class AiBillingServiceImpl implements AiBillingService {
 
     @Override
     public void completeImageCall(AiBillingReservation reservation, Integer latencyMs, boolean responseOk,
-            String errorMessage) {
+                                  String errorMessage) {
         if (reservation == null) {
             return;
         }
@@ -90,7 +94,7 @@ public class AiBillingServiceImpl implements AiBillingService {
     }
 
     private AiBillingReservation reserve(Long userId, String taskId, String agentName, String phase, String provider,
-            String model, String requestType) {
+                                         String model, String requestType) {
         ThrowUtils.throwIf(userId == null, ErrorCode.PARAMS_ERROR, "AI 调用缺少用户 id，无法计费");
         AiModelPricing pricing = pricingService.resolvePricing(provider, model, requestType);
         BigDecimal reserveCredits = amountNormalizer.normalize(pricing.getReserveCredits());
@@ -101,7 +105,7 @@ public class AiBillingServiceImpl implements AiBillingService {
     }
 
     private void recordUsage(AiBillingReservation reservation, AiTokenUsageSnapshot usage, BigDecimal cost,
-            Integer latencyMs, boolean responseOk, String errorMessage) {
+                             Integer latencyMs, boolean responseOk, String errorMessage) {
         RecordAiUsageCommand command = new RecordAiUsageCommand();
         command.setUserId(reservation.userId());
         command.setTaskId(reservation.taskId());
@@ -118,6 +122,7 @@ public class AiBillingServiceImpl implements AiBillingService {
         command.setResponseOk(responseOk);
         command.setErrorMessage(errorMessage);
         usageRecordService.recordUsage(command);
+        costMetricsRecorder.recordUsage(reservation, usage, cost, latencyMs, responseOk);
     }
 
     private String buildBizId(String taskId, String agentName, String phase) {

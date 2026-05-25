@@ -1,10 +1,48 @@
 <script setup lang="ts">
-import { BotIcon, LoaderCircleIcon, RefreshCwIcon } from '@lucide/vue'
+import { BotIcon, ExternalLinkIcon, GaugeIcon, LoaderCircleIcon, RefreshCwIcon, TerminalIcon } from '@lucide/vue'
 
 import type { AiUsageQuery } from '@/services/types/ai-usage.type'
 
 import { BasicPage } from '@/components/global-layout'
+import CopyButton from '@/components/prop-ui/copy/Copy.vue'
+import { API_BASE_URL } from '@/constants/app-config'
 import { useGetAiUsageRecordPageQuery, useGetAiUsageSummaryQuery, useGetAiUsageUserPageQuery } from '@/services/api/ai-usage.api'
+
+/**
+ * Prometheus 抓取地址沿用后端 API context-path，避免前端重复配置监控端口。
+ */
+const prometheusEndpoint = `${API_BASE_URL}/actuator/prometheus`
+
+/**
+ * Grafana 面板推荐查询，覆盖成本、Token、调用量和平均耗时四个运维视角。
+ */
+const grafanaPanels = [
+  {
+    title: '实时积分成本',
+    description: '按供应商和模型观察最近 5 分钟成本燃烧速度。',
+    query: 'sum(rate(ai_cost_credits_total[5m])) by (provider, model)',
+  },
+  {
+    title: '阶段成本分布',
+    description: '定位哪个创作阶段在最近 1 小时消耗最高。',
+    query: 'sum(increase(ai_cost_credits_total[1h])) by (phase)',
+  },
+  {
+    title: 'Token 吞吐',
+    description: '按模型查看总 Token 实时吞吐，辅助判断流量和账单波动。',
+    query: 'sum(rate(ai_cost_tokens_total{token_type="total"}[5m])) by (provider, model)',
+  },
+  {
+    title: '平均调用耗时',
+    description: '用 Timer 的 sum/count 计算最近 5 分钟平均模型延迟。',
+    query: 'sum(rate(ai_cost_latency_seconds_sum[5m])) by (provider, model) / sum(rate(ai_cost_latency_seconds_count[5m])) by (provider, model)',
+  },
+] as const
+
+/**
+ * Prometheus 指标维度说明，只展示低基数字段，避免鼓励把用户或任务 ID 放进时序标签。
+ */
+const metricTags = ['provider', 'model', 'request_type', 'phase', 'agent_name', 'status'] as const
 
 /**
  * AI 用量查询条件。
@@ -65,6 +103,76 @@ function reset() {
         刷新
       </UiButton>
     </template>
+
+    <UiCard class="border-border/70">
+      <UiCardHeader class="border-b bg-muted/30">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <UiCardTitle class="flex items-center gap-2 text-base">
+              <GaugeIcon class="size-4" />
+              Prometheus / Grafana 实时监控
+            </UiCardTitle>
+            <UiCardDescription class="mt-1">
+              这里给出实时运维指标接入信息；历史明细和用户维度仍由下方账本数据提供。
+            </UiCardDescription>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <UiButton as="a" variant="outline" :href="prometheusEndpoint" target="_blank" rel="noreferrer">
+              <ExternalLinkIcon class="mr-1 size-4" />
+              Prometheus 指标
+            </UiButton>
+            <CopyButton :content="prometheusEndpoint" copy-tooltip-text="复制抓取地址" copied-tooltip-text="已复制抓取地址" />
+          </div>
+        </div>
+      </UiCardHeader>
+      <UiCardContent class="grid gap-4 pt-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div class="grid gap-3 md:grid-cols-2">
+          <div v-for="panel in grafanaPanels" :key="panel.title" class="rounded-md border bg-background p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="font-medium">
+                  {{ panel.title }}
+                </div>
+                <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                  {{ panel.description }}
+                </p>
+              </div>
+              <CopyButton :content="panel.query" size="sm" variant="ghost" copy-tooltip-text="复制 PromQL" copied-tooltip-text="已复制 PromQL" />
+            </div>
+            <pre class="mt-3 overflow-x-auto rounded-md bg-muted p-3 text-xs leading-5"><code>{{ panel.query }}</code></pre>
+          </div>
+        </div>
+        <div class="rounded-md border bg-background p-4">
+          <div class="flex items-center gap-2 font-medium">
+            <TerminalIcon class="size-4" />
+            指标口径
+          </div>
+          <div class="mt-3 space-y-3 text-sm text-muted-foreground">
+            <div>
+              <div class="text-foreground">
+                Micrometer 指标
+              </div>
+              <p class="mt-1 break-all">
+                ai_cost_calls_total、ai_cost_credits_total、ai_cost_tokens_total、ai_cost_latency_seconds
+              </p>
+            </div>
+            <div>
+              <div class="text-foreground">
+                低基数标签
+              </div>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <UiBadge v-for="tag in metricTags" :key="tag" variant="secondary">
+                  {{ tag }}
+                </UiBadge>
+              </div>
+            </div>
+            <p>
+              用户 ID、任务 ID、错误详情只保存在历史明细中，不进入 Prometheus 标签。
+            </p>
+          </div>
+        </div>
+      </UiCardContent>
+    </UiCard>
 
     <div class="grid gap-4 md:grid-cols-4">
       <UiCard class="border-border/70">
@@ -213,3 +321,10 @@ function reset() {
     </div>
   </BasicPage>
 </template>
+
+<route lang="yaml">
+meta:
+  auth: true
+  section: admin
+  requiresAdmin: true
+</route>
