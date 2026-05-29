@@ -84,6 +84,31 @@ button:disabled {
   transform: translateY(-1px);
 }
 
+.rednote-preview-stage {
+  display: grid;
+  min-height: 760px;
+  place-items: start center;
+  padding: 24px 0 48px;
+}
+
+.rednote-phone-shell {
+  width: min(430px, 100%);
+  border-radius: 48px;
+  padding: 12px;
+  background: #111827;
+  box-shadow: 0 34px 90px rgba(15, 23, 42, 0.20);
+  animation: rednote-phone-enter 640ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.rednote-phone-screen {
+  position: relative;
+  overflow: hidden;
+  min-height: 760px;
+  max-height: 820px;
+  border-radius: 38px;
+  background: #ffffff;
+}
+
 @keyframes rednote-flow-rise {
   from {
     opacity: 0;
@@ -104,5 +129,17 @@ button:disabled {
 
   50% {
     box-shadow: 0 0 0 8px rgba(15, 23, 42, 0.04);
+  }
+}
+
+@keyframes rednote-phone-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }

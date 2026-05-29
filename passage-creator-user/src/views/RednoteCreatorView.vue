@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import HugeIcon, { type HugeIconData } from '@/components/common/HugeIcon'
+import RednotePostPreview from '@/components/rednote/RednotePostPreview.vue'
 import { createRednoteTask, getRednoteDetail } from '@/services/api'
 import { connectRednoteSse } from '@/services/sse'
 import type { AppRednoteItem, RednotePhase, SseMessage } from '@/types'
@@ -57,6 +58,7 @@ const tags = computed(() => parseStringList(activeNote.value?.tags))
 const keywords = computed(() => parseStringList(activeNote.value?.keywords))
 const searchResults = computed(() => parseJsonArray<SearchResult>(activeNote.value?.searchResults))
 const images = computed(() => parseJsonArray<RednoteImage>(activeNote.value?.images).filter(image => image.url && image.type !== 'COVER'))
+const previewTitle = computed(() => activeNote.value?.subject || activeNote.value?.coverTitle || content.value || '小红书笔记预览')
 
 /**
  * 解析小红书标签字段，兼容 JSON 数组和空格分隔文本。
@@ -323,6 +325,17 @@ onBeforeUnmount(stopSse)
             <p class="mt-2 text-sm text-slate-500">系统会自动完成检索、文案、图片规划和图片生成。</p>
           </div>
         </section>
+
+        <RednotePostPreview
+          v-else-if="isCompleted"
+          :body="activeNote?.bodyContent"
+          :context="activeNote?.context"
+          :cover-image="activeNote?.coverImage"
+          :cover-title="activeNote?.coverTitle"
+          :images="images"
+          :tags="tags"
+          :title="previewTitle"
+        />
 
         <section v-else class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <article class="glass-panel rounded-[2rem] p-6">
