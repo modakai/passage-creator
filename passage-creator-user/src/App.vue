@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { BotIcon, CreditCardIcon, FileTextIcon, HomeIcon, SparklesIcon, UserIcon } from '@lucide/vue'
+import { BotIcon, CreditCardIcon, FileTextIcon, HomeIcon, LogInIcon, SparklesIcon, UserIcon } from '@lucide/vue'
+import { computed, onMounted } from 'vue'
+
+import { getCurrentUser } from '@/services/api'
+import { isLoggedIn, sessionState } from '@/services/session'
 
 const navItems = [
   { label: '创作', path: '/', icon: HomeIcon },
@@ -8,6 +12,16 @@ const navItems = [
   { label: '额度', path: '/credits', icon: CreditCardIcon },
   { label: '我的', path: '/profile', icon: UserIcon },
 ]
+
+const userInitial = computed(() => (sessionState.user?.userName || sessionState.user?.userAccount || 'S').slice(0, 1).toUpperCase())
+const displayName = computed(() => sessionState.user?.userName || sessionState.user?.userAccount || '登录')
+
+onMounted(() => {
+  // 应用刷新后用后端校验 token，失败会由请求层清理会话并跳转登录页。
+  if (isLoggedIn.value) {
+    void getCurrentUser()
+  }
+})
 </script>
 
 <template>
@@ -38,9 +52,14 @@ const navItems = [
           <span class="hidden rounded-full border border-slate-200 bg-white/70 px-3 py-2 text-xs text-slate-600 sm:inline">
             8,420 credits
           </span>
-          <span class="grid size-9 place-items-center rounded-full bg-slate-950 text-sm font-semibold text-white shadow-lg shadow-slate-900/10">
-            S
-          </span>
+          <RouterLink v-if="isLoggedIn" to="/profile" class="flex items-center gap-2 rounded-full bg-slate-950 py-1 pl-1 pr-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10">
+            <span class="grid size-8 place-items-center rounded-full bg-white/15">{{ userInitial }}</span>
+            <span class="hidden max-w-24 truncate sm:inline">{{ displayName }}</span>
+          </RouterLink>
+          <RouterLink v-else to="/auth" class="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/10">
+            <LogInIcon class="size-4" />
+            登录
+          </RouterLink>
         </div>
       </nav>
     </header>

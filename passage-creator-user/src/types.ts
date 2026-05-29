@@ -9,6 +9,24 @@ export interface PageResponse<T> {
   totalRow: number
 }
 
+export interface LoginPayload {
+  userAccount: string
+  userPassword: string
+}
+
+export interface RegisterPayload {
+  userAccount: string
+  userPassword: string
+  checkPassword: string
+}
+
+export interface CreditSummary {
+  userId: string
+  balance: number
+  totalRecharge: number
+  totalConsume: number
+}
+
 export interface ArticleTitleOption {
   mainTitle: string
   subTitle: string

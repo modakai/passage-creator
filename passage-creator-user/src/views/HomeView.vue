@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { inspirationCards, workflowSteps } from '@/data/ui'
+import { isLoggedIn } from '@/services/session'
 
 const router = useRouter()
 const prompt = ref('')
@@ -17,10 +18,24 @@ function startCreation() {
   if (!value) {
     return
   }
-  router.push({
+  const target = {
     path: mode.value === 'article' ? '/article-creator' : '/rednote-creator',
     query: { prompt: value },
-  })
+  }
+
+  // 首页公开展示，但进入真实后端创作流程前必须登录。
+  if (!isLoggedIn.value) {
+    router.push({
+      path: '/auth',
+      query: {
+        mode: 'login',
+        return: router.resolve(target).fullPath,
+      },
+    })
+    return
+  }
+
+  router.push(target)
 }
 
 /**

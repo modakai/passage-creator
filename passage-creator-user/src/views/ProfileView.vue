@@ -1,3 +1,20 @@
+<script setup lang="ts">
+import { useRouter } from 'vue-router'
+
+import { logout } from '@/services/api'
+import { sessionState } from '@/services/session'
+
+const router = useRouter()
+
+/**
+ * 退出登录时同时通知后端和清理本地 token，然后回到登录页。
+ */
+async function handleLogout() {
+  await logout()
+  await router.replace('/auth?mode=login')
+}
+</script>
+
 <template>
   <div class="space-y-8">
     <section>
@@ -7,9 +24,10 @@
 
     <section class="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
       <aside class="glass-panel rounded-[2rem] p-6 text-center">
-        <div class="mx-auto grid size-24 place-items-center rounded-full bg-slate-950 text-3xl font-semibold text-white">S</div>
-        <h2 class="mt-5 text-2xl font-semibold tracking-[-0.04em]">Sakura</h2>
-        <p class="mt-2 text-sm text-slate-500">sakura@example.com</p>
+        <img v-if="sessionState.user?.userAvatar" :src="sessionState.user.userAvatar" alt="用户头像" class="mx-auto size-24 rounded-full object-cover" />
+        <div v-else class="mx-auto grid size-24 place-items-center rounded-full bg-slate-950 text-3xl font-semibold text-white">{{ (sessionState.user?.userName || sessionState.user?.userAccount || 'S').slice(0, 1).toUpperCase() }}</div>
+        <h2 class="mt-5 text-2xl font-semibold tracking-[-0.04em]">{{ sessionState.user?.userName || sessionState.user?.userAccount || '创作者' }}</h2>
+        <p class="mt-2 text-sm text-slate-500">{{ sessionState.user?.userAccount || '已登录账号' }}</p>
         <span class="mt-5 inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-sm text-emerald-700">Creator Pro</span>
       </aside>
 
@@ -17,7 +35,7 @@
         <section v-for="group in [
           { title: '创作偏好', items: ['默认模型：GPT-4.1', '默认写作风格：专业自然', '默认文章长度：1500 - 2000 字', '默认生成配图：开启'] },
           { title: '通知设置', items: ['任务完成提醒：开启', '等待确认提醒：开启', '额度不足提醒：开启'] },
-          { title: '账号安全', items: ['修改密码', '登录设备：2 台设备', '退出登录'] }
+          { title: '账号安全', items: ['修改密码', '登录设备：2 台设备'] }
         ]" :key="group.title" class="glass-panel overflow-hidden rounded-[2rem]">
           <h3 class="border-b border-slate-100 px-6 py-4 text-sm font-semibold text-slate-500">{{ group.title }}</h3>
           <div>
@@ -27,6 +45,9 @@
             </button>
           </div>
         </section>
+        <button type="button" class="w-full rounded-[2rem] border border-rose-100 bg-rose-50 px-6 py-4 text-left text-sm font-semibold text-rose-700 hover:bg-rose-100" @click="handleLogout">
+          退出登录
+        </button>
       </div>
     </section>
   </div>

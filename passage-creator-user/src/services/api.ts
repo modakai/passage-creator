@@ -1,42 +1,124 @@
-import type { ApiResponse, AppArticleItem, AppRednoteItem, PageResponse } from '@/types'
+import type { ApiResponse, AppArticleItem, AppRednoteItem, CreditSummary, LoginPayload, PageResponse, RegisterPayload } from '@/types'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
-const TOKEN_STORAGE_KEY = 'sakura_user_token'
+import { clearSession, sessionState, setSession, type LoginUser } from './session'
+
+const DEFAULT_API_HOST = 'http://localhost:8101'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || `${import.meta.env.VITE_SERVER_API_URL || DEFAULT_API_HOST}${import.meta.env.VITE_SERVER_API_PREFIX || '/api'}`
+const TOKEN_HEADER_NAME = import.meta.env.VITE_AUTH_TOKEN_HEADER_NAME || 'Authorization'
+const TOKEN_HEADER_PREFIX = import.meta.env.VITE_AUTH_TOKEN_HEADER_PREFIX ?? 'Bearer '
+const COMPATIBILITY_TOKEN_HEADER_NAME = import.meta.env.VITE_AUTH_COMPATIBILITY_TOKEN_HEADER_NAME || 'token'
+const COMPATIBILITY_TOKEN_HEADER_ENABLED = import.meta.env.VITE_AUTH_COMPATIBILITY_TOKEN_HEADER_ENABLED !== 'false'
+
+type RequestOptions = RequestInit & {
+  auth?: boolean
+}
 
 /**
- * 读取独立用户端保存的登录令牌；未登录时允许请求继续由后端返回 401。
+ * 创建带鉴权和语言信息的请求头，保持和后端 TokenManager 配置一致。
  */
-function getAuthToken() {
-  return window.localStorage.getItem(TOKEN_STORAGE_KEY) || ''
+function buildHeaders(options: RequestOptions) {
+  const headers = new Headers(options.headers)
+  headers.set('Accept-Language', 'zh-CN')
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
+
+  if (options.auth !== false && sessionState.token) {
+    headers.set(TOKEN_HEADER_NAME, `${TOKEN_HEADER_PREFIX}${sessionState.token}`)
+    if (COMPATIBILITY_TOKEN_HEADER_ENABLED) {
+      headers.set(COMPATIBILITY_TOKEN_HEADER_NAME, sessionState.token)
+    }
+  }
+
+  return headers
 }
 
 /**
  * 统一处理后端 BaseResponse，避免页面里重复判断 code/message。
  */
-async function request<T>(path: string, options: RequestInit = {}) {
-  const headers = new Headers(options.headers)
-  headers.set('Content-Type', 'application/json')
-  headers.set('Accept-Language', 'zh-CN')
-
-  const token = getAuthToken()
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`)
-  }
-
+async function request<T>(path: string, options: RequestOptions = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    headers,
+    headers: buildHeaders(options),
   })
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearSession()
+      redirectToLogin()
+    }
     throw new Error(`请求失败：${response.status}`)
   }
 
   const result = await response.json() as ApiResponse<T>
   if (result.code && result.code !== 0 && result.code !== 200) {
+    if (result.code === 40100) {
+      clearSession()
+      redirectToLogin()
+    }
     throw new Error(result.message || '业务请求失败')
   }
   return result.data as T
+}
+
+/**
+ * 登录失效时保留当前地址，用户重新登录后能回到原工作流。
+ */
+function redirectToLogin() {
+  const current = `${window.location.pathname}${window.location.search}`
+  if (!current.startsWith('/auth')) {
+    window.location.replace(`/auth?mode=login&return=${encodeURIComponent(current)}`)
+  }
+}
+
+/**
+ * 调用后端登录接口并写入独立用户端会话。
+ */
+export async function login(payload: LoginPayload) {
+  const user = await request<LoginUser>('/user/login', {
+    method: 'POST',
+    auth: false,
+    body: JSON.stringify(payload),
+  })
+  setSession(user)
+  return user
+}
+
+/**
+ * 注册后立即登录，降低新用户从注册到创作的断点。
+ */
+export async function register(payload: RegisterPayload) {
+  await request<number>('/user/register', {
+    method: 'POST',
+    auth: false,
+    body: JSON.stringify(payload),
+  })
+  return login({
+    userAccount: payload.userAccount,
+    userPassword: payload.userPassword,
+  })
+}
+
+/**
+ * 拉取当前登录用户，用于刷新后校验 token 是否仍有效。
+ */
+export async function getCurrentUser() {
+  const user = await request<LoginUser>('/user/get/login', { method: 'GET' })
+  setSession({ ...user, token: sessionState.token })
+  return user
+}
+
+/**
+ * 通知后端注销并清理本地会话。
+ */
+export async function logout() {
+  try {
+    await request<boolean>('/user/logout', { method: 'POST' })
+  }
+  finally {
+    clearSession()
+  }
 }
 
 /**
@@ -106,4 +188,11 @@ export function listRednotes(status = '') {
   })
 }
 
-export { API_BASE_URL, TOKEN_STORAGE_KEY }
+/**
+ * 获取当前用户积分概览，额度页和导航余额可以复用该接口。
+ */
+export function getCreditSummary() {
+  return request<CreditSummary>('/app/credit/summary', { method: 'GET' })
+}
+
+export { API_BASE_URL, buildHeaders }
