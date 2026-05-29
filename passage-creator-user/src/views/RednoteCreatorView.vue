@@ -49,7 +49,8 @@ const flowProgressWidth = computed(() => {
   if (!taskId.value || phaseSteps.length <= 1) {
     return '0%'
   }
-  return `${Math.min(100, (currentStepIndex.value / (phaseSteps.length - 1)) * 100)}%`
+  const progress = isCompleted.value ? 100 : (currentStepIndex.value / (phaseSteps.length - 1)) * 100
+  return `${Math.min(100, progress)}%`
 })
 const canCreate = computed(() => content.value.trim().length > 0 && !isBusy.value)
 const tags = computed(() => parseStringList(activeNote.value?.tags))
@@ -279,33 +280,36 @@ onBeforeUnmount(stopSse)
       </aside>
 
       <div class="space-y-6">
-        <div class="relative py-3">
-          <!-- 流程节点使用进度线串联，避免再出现卡片化包装和编号噪音。 -->
-          <div class="absolute left-8 right-8 top-9 hidden h-px bg-slate-200 xl:block">
-            <div class="h-full bg-slate-950 transition-all duration-500" :style="{ width: flowProgressWidth }" />
-          </div>
-          <div class="grid gap-5 md:grid-cols-3 xl:grid-cols-6">
-            <div
-              v-for="(step, index) in phaseSteps"
-              :key="step.phase"
-              class="relative flex gap-3 xl:flex-col xl:items-center xl:text-center"
-            >
-              <div class="relative z-10">
+        <div class="overflow-x-auto pb-2">
+          <!-- 流程节点使用进度线串联，避免再出现卡片化包装、编号和夸张渐变。 -->
+          <div class="relative min-w-[760px] px-6 py-5">
+            <div class="absolute left-12 right-12 top-[2.7rem] h-0.5 rounded-full bg-slate-200/90">
+              <div class="rednote-flow-progress h-full rounded-full bg-slate-900" :style="{ width: flowProgressWidth }" />
+            </div>
+            <div class="relative z-10 flex items-start justify-between gap-6">
+              <div
+                v-for="(step, index) in phaseSteps"
+                :key="step.phase"
+                class="rednote-flow-node flex w-28 flex-col items-center text-center"
+                :class="{
+                  'rednote-flow-done': index < currentStepIndex || currentPhase === 'COMPLETED',
+                  'rednote-flow-current': index === currentStepIndex && taskId && !isCompleted,
+                }"
+                :style="{ animationDelay: `${index * 65}ms` }"
+              >
                 <span
-                  class="grid size-12 place-items-center rounded-full border bg-white shadow-sm transition"
-                  :class="index <= currentStepIndex && taskId ? 'border-slate-950 text-slate-950' : 'border-slate-200 text-slate-400'"
+                  class="relative grid size-11 place-items-center rounded-full border bg-white shadow-sm transition duration-300"
+                  :class="index <= currentStepIndex && taskId ? 'border-slate-950 text-slate-950 shadow-slate-900/10' : 'border-slate-200 text-slate-400'"
                 >
-                  <HugeIcon :icon="step.icon" :size="22" :stroke-width="1.7" />
+                  <HugeIcon :icon="step.icon" :size="21" :stroke-width="1.7" />
+                  <span v-if="index < currentStepIndex || currentPhase === 'COMPLETED'" class="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full bg-white text-emerald-600 ring-1 ring-emerald-100">
+                    <HugeIcon :icon="CheckmarkCircle02Icon" :size="14" :stroke-width="1.8" />
+                  </span>
+                  <span v-else-if="index === currentStepIndex && taskId && !isCompleted" class="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full bg-white text-slate-950 ring-1 ring-slate-200">
+                    <LoaderCircleIcon class="size-3.5 animate-spin" />
+                  </span>
                 </span>
-                <span v-if="index < currentStepIndex || currentPhase === 'COMPLETED'" class="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full bg-emerald-50 text-emerald-600 ring-2 ring-white">
-                  <HugeIcon :icon="CheckmarkCircle02Icon" :size="14" :stroke-width="1.8" />
-                </span>
-                <span v-else-if="index === currentStepIndex && taskId && !isCompleted" class="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full bg-white text-blue-600 ring-2 ring-white">
-                  <LoaderCircleIcon class="size-3.5 animate-spin" />
-                </span>
-              </div>
-              <div class="min-w-0">
-                <strong class="text-sm">{{ step.title }}</strong>
+                <strong class="mt-3 text-sm">{{ step.title }}</strong>
                 <p class="mt-1 text-xs leading-5 text-slate-500">{{ step.desc }}</p>
               </div>
             </div>
@@ -327,8 +331,8 @@ onBeforeUnmount(stopSse)
                 <h2 class="text-2xl font-semibold tracking-[-0.04em]">{{ activeNote?.subject || activeNote?.coverTitle || '生成中' }}</h2>
                 <p class="mt-2 text-sm leading-6 text-slate-500">{{ activeNote?.context || 'AI 正在整理参考素材和创作语境。' }}</p>
               </div>
-              <button type="button" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm" :disabled="!activeNote?.bodyContent" @click="copyBody">
-                <CopyIcon class="mr-1 inline size-4" />
+              <button type="button" class="inline-flex min-h-11 min-w-24 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm transition hover:border-slate-300 hover:bg-slate-50" :disabled="!activeNote?.bodyContent" @click="copyBody">
+                <CopyIcon class="size-4" />
                 复制
               </button>
             </div>
