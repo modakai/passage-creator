@@ -45,6 +45,12 @@ const phaseSteps: Array<{ phase: RednotePhase, title: string, desc: string, icon
 const currentPhase = computed<RednotePhase>(() => activeNote.value?.phase ?? (taskId.value ? 'PENDING' : 'PENDING'))
 const currentStepIndex = computed(() => Math.max(0, phaseSteps.findIndex(step => step.phase === currentPhase.value)))
 const isCompleted = computed(() => activeNote.value?.status === 'COMPLETED' || currentPhase.value === 'COMPLETED')
+const flowProgressWidth = computed(() => {
+  if (!taskId.value || phaseSteps.length <= 1) {
+    return '0%'
+  }
+  return `${Math.min(100, (currentStepIndex.value / (phaseSteps.length - 1)) * 100)}%`
+})
 const canCreate = computed(() => content.value.trim().length > 0 && !isBusy.value)
 const tags = computed(() => parseStringList(activeNote.value?.tags))
 const keywords = computed(() => parseStringList(activeNote.value?.keywords))
@@ -273,31 +279,38 @@ onBeforeUnmount(stopSse)
       </aside>
 
       <div class="space-y-6">
-        <section class="glass-panel rounded-[2rem] p-4 sm:p-5">
-          <!-- 流程条使用 hugeicons 强化创作阶段感，数字只作为辅助序号。 -->
-          <div class="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div class="relative py-3">
+          <!-- 流程节点使用进度线串联，避免再出现卡片化包装和编号噪音。 -->
+          <div class="absolute left-8 right-8 top-9 hidden h-px bg-slate-200 xl:block">
+            <div class="h-full bg-slate-950 transition-all duration-500" :style="{ width: flowProgressWidth }" />
+          </div>
+          <div class="grid gap-5 md:grid-cols-3 xl:grid-cols-6">
             <div
               v-for="(step, index) in phaseSteps"
               :key="step.phase"
-              class="relative rounded-[1.5rem] border p-4 transition"
-              :class="index <= currentStepIndex && taskId ? 'border-blue-100 bg-white shadow-lg shadow-blue-500/5' : 'border-slate-200 bg-white/55'"
+              class="relative flex gap-3 xl:flex-col xl:items-center xl:text-center"
             >
-              <div class="mb-4 flex items-center justify-between">
-                <span class="grid size-11 place-items-center rounded-2xl" :class="index <= currentStepIndex && taskId ? 'ai-gradient text-white' : 'bg-slate-100 text-slate-400'">
+              <div class="relative z-10">
+                <span
+                  class="grid size-12 place-items-center rounded-full border bg-white shadow-sm transition"
+                  :class="index <= currentStepIndex && taskId ? 'border-slate-950 text-slate-950' : 'border-slate-200 text-slate-400'"
+                >
                   <HugeIcon :icon="step.icon" :size="22" :stroke-width="1.7" />
                 </span>
-                <span class="grid size-6 place-items-center rounded-full text-[11px] font-semibold" :class="index <= currentStepIndex && taskId ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-400'">{{ index + 1 }}</span>
+                <span v-if="index < currentStepIndex || currentPhase === 'COMPLETED'" class="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full bg-emerald-50 text-emerald-600 ring-2 ring-white">
+                  <HugeIcon :icon="CheckmarkCircle02Icon" :size="14" :stroke-width="1.8" />
+                </span>
+                <span v-else-if="index === currentStepIndex && taskId && !isCompleted" class="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full bg-white text-blue-600 ring-2 ring-white">
+                  <LoaderCircleIcon class="size-3.5 animate-spin" />
+                </span>
               </div>
-              <div class="mb-3 flex items-center gap-2">
-                <HugeIcon v-if="index < currentStepIndex || currentPhase === 'COMPLETED'" :icon="CheckmarkCircle02Icon" :size="16" class="text-emerald-500" />
-                <LoaderCircleIcon v-else-if="index === currentStepIndex && taskId && !isCompleted" class="size-4 animate-spin text-blue-500" />
-                <span v-else class="size-4 rounded-full border border-slate-200" />
+              <div class="min-w-0">
                 <strong class="text-sm">{{ step.title }}</strong>
+                <p class="mt-1 text-xs leading-5 text-slate-500">{{ step.desc }}</p>
               </div>
-              <p class="mt-2 text-xs leading-5 text-slate-500">{{ step.desc }}</p>
             </div>
           </div>
-        </section>
+        </div>
 
         <section v-if="!taskId" class="glass-panel grid min-h-[28rem] place-items-center rounded-[2rem] p-8 text-center">
           <div>
