@@ -116,6 +116,9 @@ export async function logout() {
   try {
     await request<boolean>('/user/logout', { method: 'POST' })
   }
+  catch {
+    // 退出操作以清理前端登录态为准，后端不可用时也不能阻塞重新登录测试。
+  }
   finally {
     clearSession()
   }

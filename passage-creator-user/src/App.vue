@@ -2,7 +2,7 @@
 import { BotIcon, CreditCardIcon, FileTextIcon, HomeIcon, LogInIcon, SparklesIcon, UserIcon } from '@lucide/vue'
 import { computed, onMounted } from 'vue'
 
-import { getCurrentUser } from '@/services/api'
+import { getCurrentUser, logout } from '@/services/api'
 import { isLoggedIn, sessionState } from '@/services/session'
 
 const navItems = [
@@ -22,6 +22,13 @@ onMounted(() => {
     void getCurrentUser()
   }
 })
+
+/**
+ * 导航栏提供显式退出，方便开发和测试登录/注册流程。
+ */
+async function handleLogout() {
+  await logout()
+}
 </script>
 
 <template>
@@ -49,13 +56,13 @@ onMounted(() => {
         </div>
 
         <div class="flex items-center gap-2">
-          <span class="hidden rounded-full border border-slate-200 bg-white/70 px-3 py-2 text-xs text-slate-600 sm:inline">
-            8,420 credits
-          </span>
           <RouterLink v-if="isLoggedIn" to="/profile" class="flex items-center gap-2 rounded-full bg-slate-950 py-1 pl-1 pr-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10">
             <span class="grid size-8 place-items-center rounded-full bg-white/15">{{ userInitial }}</span>
             <span class="hidden max-w-24 truncate sm:inline">{{ displayName }}</span>
           </RouterLink>
+          <button v-if="isLoggedIn" type="button" class="hidden rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-white hover:text-slate-950 sm:inline-flex" @click="handleLogout">
+            退出
+          </button>
           <RouterLink v-else to="/auth" class="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/10">
             <LogInIcon class="size-4" />
             登录
