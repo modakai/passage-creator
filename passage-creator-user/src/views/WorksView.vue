@@ -1,11 +1,29 @@
 <script setup lang="ts">
-import { FileTextIcon, LoaderCircleIcon, RefreshCwIcon, SparklesIcon, WandSparklesIcon } from '@lucide/vue'
+import { LoaderCircleIcon, RefreshCwIcon, SparklesIcon } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import WorkCard from '@/components/work/WorkCard.vue'
 import { listArticles, listRednotes } from '@/services/api'
-import type { AppArticleItem, AppRednoteItem } from '@/types'
-import { formatTime, getStatusLabel } from '@/utils/format'
+import type { AppArticleItem, AppRednoteItem, ArticleImageResult } from '@/types'
+import { formatTime, getStatusLabel, parseJsonArray } from '@/utils/format'
+
+interface RednoteImageResult {
+  type?: string
+  url?: string
+}
+
+interface WorkItem {
+  id: string
+  type: 'article' | 'rednote'
+  title: string
+  desc?: string
+  status: string
+  time?: string
+  coverUrl?: string
+  phase?: string
+  taskId: string
+}
 
 const router = useRouter()
 const activeFilter = ref<'all' | 'article' | 'rednote'>('all')
@@ -22,6 +40,7 @@ const works = computed(() => [
     status: item.status,
     phase: item.phase,
     time: item.updateTime || item.createTime,
+    coverUrl: resolveArticleCover(item),
     taskId: item.taskId,
   })),
   ...rednotes.value.map(item => ({
@@ -32,10 +51,33 @@ const works = computed(() => [
     status: item.status || 'PENDING',
     phase: item.phase,
     time: item.updateTime || item.createTime,
+    coverUrl: resolveRednoteCover(item),
     taskId: item.taskId,
   })),
 ])
 const visibleWorks = computed(() => activeFilter.value === 'all' ? works.value : works.value.filter(item => item.type === activeFilter.value))
+
+/**
+ * 文章封面优先使用后端独立封面字段，老数据则从配图 JSON 中取第一张可用图。
+ */
+function resolveArticleCover(item: AppArticleItem) {
+  if (item.coverImage) {
+    return item.coverImage
+  }
+  const images = parseJsonArray<ArticleImageResult>(item.images)
+  return images.find(image => image.position === 1 && image.url)?.url || images.find(image => image.url)?.url
+}
+
+/**
+ * 小红书封面优先使用 coverImage，兼容 images 里包含 COVER 类型或普通图片的历史记录。
+ */
+function resolveRednoteCover(item: AppRednoteItem) {
+  if (item.coverImage) {
+    return item.coverImage
+  }
+  const images = parseJsonArray<RednoteImageResult>(item.images)
+  return images.find(image => image.type === 'COVER' && image.url)?.url || images.find(image => image.url)?.url
+}
 
 /**
  * 并行拉取两类作品记录，页面仍用卡片瀑布流展示。
@@ -55,7 +97,7 @@ async function loadWorks() {
 /**
  * 根据作品类型进入对应创作流程恢复详情。
  */
-function openWork(work: { type: 'article' | 'rednote', taskId: string }) {
+function openWork(work: WorkItem) {
   router.push({
     path: work.type === 'article' ? '/article-creator' : '/rednote-creator',
     query: { taskId: work.taskId },
@@ -90,25 +132,14 @@ onMounted(loadWorks)
     </div>
 
     <section v-else class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-      <article v-for="work in visibleWorks" :key="work.id" class="group overflow-hidden rounded-[2rem] border border-white/90 bg-white/75 shadow-xl shadow-slate-900/5 transition hover:-translate-y-1 hover:bg-white">
-        <div class="ai-gradient grid h-40 place-items-center text-white">
-          <FileTextIcon v-if="work.type === 'article'" class="size-12 opacity-80" />
-          <WandSparklesIcon v-else class="size-12 opacity-80" />
-        </div>
-        <div class="space-y-4 p-5">
-          <div class="flex items-center justify-between gap-3">
-            <span class="rounded-full border px-3 py-1 text-xs" :class="work.status === 'COMPLETED' ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-blue-100 bg-blue-50 text-blue-700'">{{ getStatusLabel(work.status) }}</span>
-            <span class="text-xs text-slate-400">{{ formatTime(work.time) }}</span>
-          </div>
-          <div>
-            <h2 class="line-clamp-2 text-xl font-semibold tracking-[-0.04em]">{{ work.title }}</h2>
-            <p class="mt-2 line-clamp-3 text-sm leading-6 text-slate-500">{{ work.desc }}</p>
-          </div>
-          <button type="button" class="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white" @click="openWork(work)">
-            {{ work.status === 'COMPLETED' ? '查看作品' : '继续创作' }}
-          </button>
-        </div>
-      </article>
+      <WorkCard
+        v-for="work in visibleWorks"
+        :key="work.id"
+        :formatted-time="formatTime(work.time)"
+        :status-label="getStatusLabel(work.status)"
+        :work="work"
+        @open="openWork"
+      />
 
       <div v-if="visibleWorks.length === 0" class="glass-panel col-span-full grid min-h-80 place-items-center rounded-[2rem] p-8 text-center">
         <div>
