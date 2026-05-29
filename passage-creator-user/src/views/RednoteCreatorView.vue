@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { CheckCircle2Icon, CopyIcon, ExternalLinkIcon, ImagesIcon, LoaderCircleIcon, RefreshCwIcon, SearchIcon, SparklesIcon } from '@lucide/vue'
+import { CopyIcon, ExternalLinkIcon, ImagesIcon, LoaderCircleIcon, RefreshCwIcon, SearchIcon, SparklesIcon } from '@lucide/vue'
+import { AiImageIcon, AiMagicIcon, AiSearchIcon, CheckmarkCircle02Icon, Download02Icon, FilePenIcon, ImageCompositionIcon } from '@hugeicons/core-free-icons'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
+import HugeIcon, { type HugeIconData } from '@/components/common/HugeIcon'
 import { createRednoteTask, getRednoteDetail } from '@/services/api'
 import { connectRednoteSse } from '@/services/sse'
 import type { AppRednoteItem, RednotePhase, SseMessage } from '@/types'
@@ -31,17 +33,18 @@ const isConnected = ref(false)
 const errorMessage = ref('')
 let closeSse: (() => void) | null = null
 
-const phaseSteps: Array<{ phase: RednotePhase, title: string, desc: string }> = [
-  { phase: 'PENDING', title: '任务准备', desc: '解析创作需求' },
-  { phase: 'SEARCH_AGENT', title: '素材检索', desc: '查找参考语境' },
-  { phase: 'COPY_GENERATING', title: '文案生成', desc: '生成笔记正文' },
-  { phase: 'IMAGE_PROMPT_GENERATING', title: '图片规划', desc: '拆分封面与配图' },
-  { phase: 'IMAGE_GENERATING', title: '图片生成', desc: '生成视觉资产' },
-  { phase: 'COMPLETED', title: '完成确认', desc: '复制和下载结果' },
+const phaseSteps: Array<{ phase: RednotePhase, title: string, desc: string, icon: HugeIconData }> = [
+  { phase: 'PENDING', title: '任务准备', desc: '解析创作需求', icon: AiMagicIcon },
+  { phase: 'SEARCH_AGENT', title: '素材检索', desc: '查找参考语境', icon: AiSearchIcon },
+  { phase: 'COPY_GENERATING', title: '文案生成', desc: '生成笔记正文', icon: FilePenIcon },
+  { phase: 'IMAGE_PROMPT_GENERATING', title: '图片规划', desc: '拆分封面与配图', icon: ImageCompositionIcon },
+  { phase: 'IMAGE_GENERATING', title: '图片生成', desc: '生成视觉资产', icon: AiImageIcon },
+  { phase: 'COMPLETED', title: '完成确认', desc: '复制和下载结果', icon: Download02Icon },
 ]
 
 const currentPhase = computed<RednotePhase>(() => activeNote.value?.phase ?? (taskId.value ? 'PENDING' : 'PENDING'))
 const currentStepIndex = computed(() => Math.max(0, phaseSteps.findIndex(step => step.phase === currentPhase.value)))
+const isCompleted = computed(() => activeNote.value?.status === 'COMPLETED' || currentPhase.value === 'COMPLETED')
 const canCreate = computed(() => content.value.trim().length > 0 && !isBusy.value)
 const tags = computed(() => parseStringList(activeNote.value?.tags))
 const keywords = computed(() => parseStringList(activeNote.value?.keywords))
@@ -249,8 +252,8 @@ onBeforeUnmount(stopSse)
       </span>
     </section>
 
-    <section class="grid gap-4 lg:grid-cols-[390px_minmax(0,1fr)]">
-      <aside class="glass-panel rounded-[2rem] p-6">
+    <section class="grid gap-4" :class="isCompleted ? 'lg:grid-cols-1' : 'lg:grid-cols-[390px_minmax(0,1fr)]'">
+      <aside v-if="!isCompleted" class="glass-panel rounded-[2rem] p-6">
         <label class="text-sm font-semibold text-slate-700">创作需求</label>
         <textarea v-model="content" class="mt-3 min-h-56 w-full resize-none rounded-3xl border border-slate-200 bg-white/80 p-4 text-sm leading-7 outline-none focus:border-rose-300" placeholder="例如：帮我写一篇夏季露营装备清单小红书笔记，200 字左右，标签 5 个，配图 3 张。" />
         <div class="mt-4 flex items-center justify-between text-xs text-slate-500">
@@ -270,15 +273,27 @@ onBeforeUnmount(stopSse)
       </aside>
 
       <div class="space-y-6">
-        <section class="glass-panel rounded-[2rem] p-5">
-          <div class="grid gap-3 md:grid-cols-6">
-            <div v-for="(step, index) in phaseSteps" :key="step.phase" class="rounded-3xl border border-slate-200 bg-white/70 p-4">
+        <section class="glass-panel rounded-[2rem] p-4 sm:p-5">
+          <!-- 流程条使用 hugeicons 强化创作阶段感，数字只作为辅助序号。 -->
+          <div class="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <div
+              v-for="(step, index) in phaseSteps"
+              :key="step.phase"
+              class="relative rounded-[1.5rem] border p-4 transition"
+              :class="index <= currentStepIndex && taskId ? 'border-blue-100 bg-white shadow-lg shadow-blue-500/5' : 'border-slate-200 bg-white/55'"
+            >
               <div class="mb-4 flex items-center justify-between">
-                <span class="grid size-8 place-items-center rounded-full text-xs font-semibold" :class="index <= currentStepIndex && taskId ? 'ai-gradient text-white' : 'bg-slate-100 text-slate-400'">{{ index + 1 }}</span>
-                <CheckCircle2Icon v-if="index < currentStepIndex || currentPhase === 'COMPLETED'" class="size-4 text-emerald-500" />
-                <LoaderCircleIcon v-else-if="index === currentStepIndex && taskId && activeNote?.status !== 'COMPLETED'" class="size-4 animate-spin text-blue-500" />
+                <span class="grid size-11 place-items-center rounded-2xl" :class="index <= currentStepIndex && taskId ? 'ai-gradient text-white' : 'bg-slate-100 text-slate-400'">
+                  <HugeIcon :icon="step.icon" :size="22" :stroke-width="1.7" />
+                </span>
+                <span class="grid size-6 place-items-center rounded-full text-[11px] font-semibold" :class="index <= currentStepIndex && taskId ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-400'">{{ index + 1 }}</span>
               </div>
-              <strong class="text-sm">{{ step.title }}</strong>
+              <div class="mb-3 flex items-center gap-2">
+                <HugeIcon v-if="index < currentStepIndex || currentPhase === 'COMPLETED'" :icon="CheckmarkCircle02Icon" :size="16" class="text-emerald-500" />
+                <LoaderCircleIcon v-else-if="index === currentStepIndex && taskId && !isCompleted" class="size-4 animate-spin text-blue-500" />
+                <span v-else class="size-4 rounded-full border border-slate-200" />
+                <strong class="text-sm">{{ step.title }}</strong>
+              </div>
               <p class="mt-2 text-xs leading-5 text-slate-500">{{ step.desc }}</p>
             </div>
           </div>
