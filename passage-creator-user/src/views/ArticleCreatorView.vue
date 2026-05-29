@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { CheckCircle2Icon, CopyIcon, FileTextIcon, ImageIcon, LoaderCircleIcon, PlusIcon, SparklesIcon, Trash2Icon } from '@lucide/vue'
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { confirmArticleOutline, confirmArticleTitle, createArticleTask } from '@/services/api'
@@ -220,6 +220,14 @@ async function copyContent() {
 }
 
 onBeforeUnmount(stopSse)
+
+onMounted(() => {
+  const initialTaskId = typeof route.query.taskId === 'string' ? route.query.taskId.trim() : ''
+  if (initialTaskId) {
+    phase.value = 'PENDING'
+    startSse(initialTaskId)
+  }
+})
 </script>
 
 <template>
